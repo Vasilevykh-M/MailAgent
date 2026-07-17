@@ -52,9 +52,11 @@ class PollingWorker:
             mailbox=reference.mailbox,
             uid=reference.uid,
         )
-        self.repository.ensure(
-            reference.mailbox, reference.uid, reference.message_id, getattr(self.graph, "pipeline_version", "worker")
+        existing = self.repository.get(stable)
+        pipeline_version = getattr(
+            self.graph, "pipeline_version", str(existing["pipeline_version"]) if existing else "worker"
         )
+        self.repository.ensure(reference.mailbox, reference.uid, reference.message_id, pipeline_version)
         if not force and not self.repository.may_attempt(stable):
             log_event(
                 LOGGER,

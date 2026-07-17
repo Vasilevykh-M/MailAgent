@@ -94,12 +94,17 @@ class AttachmentDigest(BaseModel):
 class MailProcessingState(TypedDict, total=False):
     run_id: str
     record_id: str
+    pipeline_version: str
+    processing_generation: int
     mailbox: str
     uid: str
     message_id: str | None
     message_metadata: dict[str, Any]
     normalized_body: str
     attachments: list[dict[str, Any]]
+    # Пути и payload существуют только в текущем TemporaryDirectory; их нельзя переиспользовать после рестарта.
+    attachment_payloads: list[dict[str, Any]]
+    attachment_paths: dict[str, str]
     unavailable_attachment_names: list[str]
     attachment_plans: list[dict[str, Any]]
     attachment_results: list[dict[str, Any]]
@@ -113,3 +118,5 @@ class MailProcessingState(TypedDict, total=False):
     manual_review_stage: str | None
     manual_review_error_type: str | None
     temporary_dir: str
+    pending_node_name: str | None
+    pending_execution_key: str | None

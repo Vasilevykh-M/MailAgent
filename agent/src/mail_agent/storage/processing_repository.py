@@ -1,4 +1,4 @@
-"""Транзакционное SQLite-хранилище idempotency, ошибок и кэша извлечений."""
+"""Транзакционное SQLite-хранилище состояния писем и журнала узлов графа."""
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ STATUSES = {
     "retryable_error",
     "permanent_error",
 }
+NODE_STATUSES = {"queued", "running", "completed", "retryable_error", "permanent_error", "invalidated"}
 
 
 def record_id(mailbox: str, uid: str, message_id: str | None) -> str:
@@ -33,6 +34,8 @@ def record_id(mailbox: str, uid: str, message_id: str | None) -> str:
 
 
 class ProcessingRepository:
+    """Общее состояние письма и durable-журнал выполнения отдельных узлов."""
+
     def __init__(self, path: Path, retries: RetrySettings) -> None:
         self.path, self.retries = path, retries
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,16 +60,35 @@ class ProcessingRepository:
                   message_hash TEXT, status TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0,
                   last_attempt_at TEXT, next_retry_at TEXT, failed_stage TEXT, error_type TEXT, error_message TEXT,
                   attachment_hashes TEXT NOT NULL DEFAULT '[]', cached_extraction_results TEXT NOT NULL DEFAULT '{}',
-                  checkpoint TEXT, pipeline_version TEXT NOT NULL, table_commit_status TEXT NOT NULL DEFAULT 'pending',
-                  current_stage TEXT, sender TEXT, subject TEXT, message_date TEXT,
-                  requires_manual_review INTEGER NOT NULL DEFAULT 0, manual_review_stage TEXT,
-                  manual_review_error_type TEXT,
-                  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT
+                  checkpoint TEXT, pipeline_version TEXT NOT NULL, processing_generation INTEGER NOT NULL DEFAULT 0,
+                  table_commit_status TEXT NOT NULL DEFAULT 'pending', current_stage TEXT, sender TEXT, subject TEXT,
+                  message_date TEXT, requires_manual_review INTEGER NOT NULL DEFAULT 0, manual_review_stage TEXT,
+                  manual_review_error_type TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS processing_mail_uid ON processing_records(mailbox, uid, record_id);
                 CREATE TABLE IF NOT EXISTS extraction_cache (
                   cache_key TEXT PRIMARY KEY, attachment_sha256 TEXT NOT NULL, pipeline_version TEXT NOT NULL,
                   parameters_hash TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS node_executions (
+                  execution_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  record_id TEXT NOT NULL, thread_id TEXT NOT NULL, node_name TEXT NOT NULL,
+                  pipeline_version TEXT NOT NULL, execution_key TEXT NOT NULL,
+                  input_context_hash TEXT NOT NULL, status TEXT NOT NULL,
+                  attempt_count INTEGER NOT NULL DEFAULT 0, previous_status TEXT,
+                  context_json TEXT NOT NULL, output_json TEXT, error_type TEXT, error_message TEXT,
+                  created_at TEXT NOT NULL, started_at TEXT, completed_at TEXT, updated_at TEXT NOT NULL,
+                  UNIQUE(record_id, node_name, pipeline_version, execution_key)
+                );
+                CREATE INDEX IF NOT EXISTS node_executions_record_stage
+                  ON node_executions(record_id, node_name, updated_at DESC);
+                CREATE INDEX IF NOT EXISTS node_executions_record_status
+                  ON node_executions(record_id, status, updated_at DESC);
+                CREATE TABLE IF NOT EXISTS node_execution_attempts (
+                  execution_id INTEGER NOT NULL, attempt_number INTEGER NOT NULL, status TEXT NOT NULL,
+                  error_type TEXT, created_at TEXT NOT NULL, started_at TEXT, completed_at TEXT, updated_at TEXT NOT NULL,
+                  PRIMARY KEY(execution_id, attempt_number),
+                  FOREIGN KEY(execution_id) REFERENCES node_executions(execution_id)
                 );
                 CREATE TABLE IF NOT EXISTS runtime_status (
                   singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -86,6 +108,7 @@ class ProcessingRepository:
                 "requires_manual_review": "INTEGER NOT NULL DEFAULT 0",
                 "manual_review_stage": "TEXT",
                 "manual_review_error_type": "TEXT",
+                "processing_generation": "INTEGER NOT NULL DEFAULT 0",
             }.items():
                 if name not in existing:
                     connection.execute(f"ALTER TABLE processing_records ADD COLUMN {name} {definition}")
@@ -97,16 +120,46 @@ class ProcessingRepository:
     def _now() -> str:
         return datetime.now(UTC).isoformat()
 
+    @staticmethod
+    def _json(value: Any) -> str:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+    @staticmethod
+    def _row_execution(row: sqlite3.Row) -> dict[str, Any]:
+        item = dict(row)
+        output = item.pop("output_json", None)
+        context = item.pop("context_json", None)
+        item["output"] = json.loads(output) if isinstance(output, str) else None
+        item["context"] = json.loads(context) if isinstance(context, str) else None
+        return item
+
     def ensure(self, mailbox: str, uid: str, message_id: str | None, pipeline_version: str) -> str:
+        """Создаёт запись либо безопасно начинает новый run при смене версии pipeline."""
+
         stable = record_id(mailbox, uid, message_id)
         now = self._now()
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            connection.execute(
-                """INSERT INTO processing_records(record_id, mailbox, uid, message_id, status, pipeline_version, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, 'discovered', ?, ?, ?) ON CONFLICT(record_id) DO NOTHING""",
-                (stable, mailbox, uid, message_id, pipeline_version, now, now),
-            )
+            existing = connection.execute(
+                "SELECT pipeline_version FROM processing_records WHERE record_id=?", (stable,)
+            ).fetchone()
+            if existing is None:
+                connection.execute(
+                    """INSERT INTO processing_records(
+                           record_id, mailbox, uid, message_id, status, pipeline_version, created_at, updated_at
+                       ) VALUES (?, ?, ?, ?, 'discovered', ?, ?, ?)""",
+                    (stable, mailbox, uid, message_id, pipeline_version, now, now),
+                )
+            elif str(existing["pipeline_version"]) != pipeline_version:
+                connection.execute(
+                    """UPDATE processing_records
+                       SET pipeline_version=?, processing_generation=processing_generation+1, status='discovered',
+                           next_retry_at=NULL, current_stage=NULL, failed_stage=NULL, error_type=NULL,
+                           error_message=NULL, checkpoint=NULL, table_commit_status='pending', completed_at=NULL,
+                           requires_manual_review=0, manual_review_stage=NULL, manual_review_error_type=NULL,
+                           updated_at=? WHERE record_id=?""",
+                    (pipeline_version, now, stable),
+                )
             connection.execute("COMMIT")
         return stable
 
@@ -122,17 +175,19 @@ class ProcessingRepository:
         if item["status"] == "permanent_error" and not self.retries.permanent_error_retry:
             return False
         if item["status"] == "retryable_error" and item["next_retry_at"]:
-            return datetime.fromisoformat(item["next_retry_at"]) <= datetime.now(UTC)
+            return datetime.fromisoformat(str(item["next_retry_at"])) <= datetime.now(UTC)
         return str(item["status"]) != "completed"
 
     def start(self, stable: str) -> None:
+        """Фиксирует новую попытку всего письма, не удаляя журнал успешных узлов."""
+
         now = self._now()
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 """UPDATE processing_records
                    SET status='processing', current_stage='check_idempotency', attempt_count=attempt_count+1,
-                       last_attempt_at=?, requires_manual_review=0, manual_review_stage=NULL,
+                       last_attempt_at=?, next_retry_at=NULL, requires_manual_review=0, manual_review_stage=NULL,
                        manual_review_error_type=NULL, updated_at=? WHERE record_id=?""",
                 (now, now, stable),
             )
@@ -146,6 +201,8 @@ class ProcessingRepository:
         checkpoint: dict[str, Any] | None = None,
         attachment_hashes: list[str] | None = None,
     ) -> None:
+        """Совместимый API для краткого статуса, без хранения полного graph state."""
+
         if status not in STATUSES:
             raise ValueError("Unknown processing status")
         with self._connection() as connection:
@@ -155,19 +212,21 @@ class ProcessingRepository:
                        updated_at=? WHERE record_id=?""",
                 (
                     status,
-                    json.dumps(checkpoint, ensure_ascii=False) if checkpoint is not None else None,
-                    json.dumps(attachment_hashes) if attachment_hashes is not None else None,
+                    self._json(checkpoint) if checkpoint is not None else None,
+                    self._json(attachment_hashes) if attachment_hashes is not None else None,
                     self._now(),
                     stable,
                 ),
             )
 
     def table_committed(self, stable: str, checkpoint: dict[str, Any]) -> None:
+        """Фиксирует подтверждённую Excel-операцию; полный state остаётся в LangGraph."""
+
         with self._connection() as connection:
             connection.execute(
                 """UPDATE processing_records
                    SET status='table_committed', table_commit_status='verified', checkpoint=?, updated_at=? WHERE record_id=?""",
-                (json.dumps(checkpoint, ensure_ascii=False), self._now(), stable),
+                (self._json(checkpoint), self._now(), stable),
             )
 
     def completed(self, stable: str) -> None:
@@ -187,13 +246,13 @@ class ProcessingRepository:
                 """UPDATE processing_records
                    SET requires_manual_review=1, manual_review_stage=?, manual_review_error_type=?, updated_at=?
                    WHERE record_id=?""",
-                (stage, error_type, self._now(), stable),
+                (stage, error_type[:160], self._now(), stable),
             )
 
-    def error(self, stable: str, stage: str, exc: Exception) -> str:
+    def _error(self, stable: str, stage: str, error_type: str, permanent: bool) -> str:
         item = self.get(stable) or {}
         attempts = int(item.get("attempt_count", 0))
-        retryable = not isinstance(exc, PermanentError) and attempts < self.retries.max_attempts
+        retryable = not permanent and attempts < self.retries.max_attempts
         status = "retryable_error" if retryable else "permanent_error"
         next_retry: str | None = None
         if retryable:
@@ -205,42 +264,63 @@ class ProcessingRepository:
         with self._connection() as connection:
             connection.execute(
                 """UPDATE processing_records
-                   SET status=?, current_stage=NULL, failed_stage=?, error_type=?, error_message=?, next_retry_at=?, updated_at=?
+                   SET status=?, current_stage=NULL, failed_stage=?, error_type=?,
+                       error_message='Детали ошибки не сохраняются.', next_retry_at=?, updated_at=?
                    WHERE record_id=?""",
-                (status, stage, type(exc).__name__, str(exc)[:1000], next_retry, self._now(), stable),
+                (status, stage, error_type[:160], next_retry, self._now(), stable),
             )
         return status
 
+    def error(self, stable: str, stage: str, exc: Exception) -> str:
+        return self._error(stable, stage, type(exc).__name__, isinstance(exc, PermanentError))
+
+    def error_safe(self, stable: str, stage: str, error_type: str, *, permanent: bool) -> str:
+        return self._error(stable, stage, error_type, permanent)
+
     def requeue_failed(self, stable: str, *, include_permanent: bool = False) -> bool:
-        """Сбрасывает ошибку только по явной ручной команде оператора."""
+        """Ставит ошибку в очередь, сохраняя счётчики и результаты успешных узлов."""
 
         statuses = ("retryable_error", "permanent_error") if include_permanent else ("retryable_error",)
         placeholders = ",".join("?" for _ in statuses)
         with self._connection() as connection:
             cursor = connection.execute(
                 f"""UPDATE processing_records
-                    SET status='discovered', attempt_count=0, last_attempt_at=NULL, next_retry_at=NULL,
-                        current_stage=NULL, failed_stage=NULL, error_type=NULL, error_message=NULL, updated_at=?
+                    SET status='discovered', next_retry_at=NULL, current_stage=NULL, failed_stage=NULL,
+                        error_type=NULL, error_message=NULL, updated_at=?
                     WHERE record_id=? AND status IN ({placeholders})""",
                 (self._now(), stable, *statuses),
             )
         return cursor.rowcount == 1
 
-    def requeue_completed(self, stable: str) -> bool:
-        """Явно ставит готовое письмо в очередь для полного повторного анализа."""
+    def requeue_for_reprocess(self, stable: str) -> bool:
+        """Инвалидирует все cached результаты конкретного письма для полного --reprocess."""
 
+        now = self._now()
         with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             cursor = connection.execute(
                 """UPDATE processing_records
-                    SET status='discovered', attempt_count=0, last_attempt_at=NULL, next_retry_at=NULL,
-                        current_stage=NULL, failed_stage=NULL, error_type=NULL, error_message=NULL,
-                        checkpoint=NULL, table_commit_status='pending', completed_at=NULL,
-                        requires_manual_review=0, manual_review_stage=NULL, manual_review_error_type=NULL,
-                        updated_at=?
-                    WHERE record_id=? AND status='completed'""",
-                (self._now(), stable),
+                   SET status='discovered', processing_generation=processing_generation+1, next_retry_at=NULL,
+                       current_stage=NULL, failed_stage=NULL, error_type=NULL, error_message=NULL, checkpoint=NULL,
+                       table_commit_status='pending', completed_at=NULL, requires_manual_review=0,
+                       manual_review_stage=NULL, manual_review_error_type=NULL, updated_at=?
+                   WHERE record_id=?""",
+                (now, stable),
             )
+            if cursor.rowcount == 1:
+                connection.execute(
+                    """UPDATE node_executions SET previous_status=status, status='invalidated', updated_at=?
+                       WHERE record_id=? AND status != 'invalidated'""",
+                    (now, stable),
+                )
+            connection.execute("COMMIT")
         return cursor.rowcount == 1
+
+    def requeue_completed(self, stable: str) -> bool:
+        """Совместимое имя операции полного повторного анализа."""
+
+        item = self.get(stable)
+        return bool(item and item["status"] == "completed" and self.requeue_for_reprocess(stable))
 
     def retry_failed(self, *, include_permanent: bool = False) -> list[dict[str, Any]]:
         statuses = ("retryable_error", "permanent_error") if include_permanent else ("retryable_error",)
@@ -248,6 +328,183 @@ class ProcessingRepository:
         with self._connection() as connection:
             rows = connection.execute(
                 f"SELECT * FROM processing_records WHERE status IN ({placeholders})", statuses
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def claim_node_execution(
+        self,
+        *,
+        record: str,
+        thread_id: str,
+        node_name: str,
+        pipeline_version: str,
+        execution_key: str,
+        input_context_hash: str,
+        context: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Атомарно получает право выполнить узел либо возвращает его durable результат."""
+
+        now = self._now()
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """SELECT * FROM node_executions
+                   WHERE record_id=? AND node_name=? AND pipeline_version=? AND execution_key=?""",
+                (record, node_name, pipeline_version, execution_key),
+            ).fetchone()
+            if row is not None and row["status"] == "completed" and row["output_json"]:
+                connection.execute("COMMIT")
+                return {"decision": "reuse", "execution": self._row_execution(row)}
+            if row is not None and row["status"] == "running":
+                connection.execute("COMMIT")
+                return {"decision": "busy", "execution": self._row_execution(row)}
+            previous_status = str(row["status"]) if row is not None else None
+            if row is None:
+                cursor = connection.execute(
+                    """INSERT INTO node_executions(
+                           record_id, thread_id, node_name, pipeline_version, execution_key, input_context_hash,
+                           status, context_json, created_at, updated_at
+                       ) VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)""",
+                    (
+                        record,
+                        thread_id,
+                        node_name,
+                        pipeline_version,
+                        execution_key,
+                        input_context_hash,
+                        self._json(context),
+                        now,
+                        now,
+                    ),
+                )
+                if cursor.lastrowid is None:  # pragma: no cover - SQLite INSERT invariant
+                    connection.execute("ROLLBACK")
+                    raise RuntimeError("SQLite не вернул идентификатор выполнения узла.")
+                execution_id = int(cursor.lastrowid)
+                attempt = 1
+                connection.execute(
+                    """UPDATE node_executions
+                       SET status='running', attempt_count=1, started_at=?, updated_at=? WHERE execution_id=?""",
+                    (now, now, execution_id),
+                )
+            else:
+                execution_id = int(row["execution_id"])
+                attempt = int(row["attempt_count"]) + 1
+                connection.execute(
+                    """UPDATE node_executions
+                       SET status='running', attempt_count=?, previous_status=?, context_json=?, output_json=NULL,
+                           error_type=NULL, error_message=NULL, started_at=?, completed_at=NULL, updated_at=?
+                       WHERE execution_id=?""",
+                    (attempt, previous_status, self._json(context), now, now, execution_id),
+                )
+            connection.execute(
+                """INSERT INTO node_execution_attempts(
+                       execution_id, attempt_number, status, created_at, started_at, updated_at
+                   ) VALUES (?, ?, 'running', ?, ?, ?)""",
+                (execution_id, attempt, now, now, now),
+            )
+            claimed = connection.execute(
+                "SELECT * FROM node_executions WHERE execution_id=?", (execution_id,)
+            ).fetchone()
+            connection.execute("COMMIT")
+        if claimed is None:  # pragma: no cover - SQLite invariant
+            raise RuntimeError("Не удалось получить запись выполнения узла.")
+        return {"decision": "execute", "execution": self._row_execution(claimed)}
+
+    def store_node_result(self, execution_key: str, output: dict[str, Any]) -> None:
+        """Сохраняет JSON patch до checkpoint; статус остаётся running до подтверждения graph."""
+
+        with self._connection() as connection:
+            cursor = connection.execute(
+                """UPDATE node_executions SET output_json=?, updated_at=?
+                   WHERE execution_key=? AND status='running'""",
+                (self._json(output), self._now(), execution_key),
+            )
+        if cursor.rowcount != 1:
+            raise RuntimeError("Результат узла нельзя сохранить без активного выполнения.")
+
+    def complete_node_execution(self, execution_key: str) -> None:
+        """Помечает узел completed только после checkpoint, созданного предыдущим superstep."""
+
+        now = self._now()
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT execution_id, attempt_count, output_json FROM node_executions WHERE execution_key=?",
+                (execution_key,),
+            ).fetchone()
+            if row is None or not row["output_json"]:
+                connection.execute("ROLLBACK")
+                raise RuntimeError("Checkpoint подтверждает отсутствующий результат узла.")
+            if row["output_json"] and row["execution_id"] and row["attempt_count"]:
+                connection.execute(
+                    """UPDATE node_executions SET status='completed', completed_at=?, updated_at=?
+                       WHERE execution_id=? AND status='running'""",
+                    (now, now, row["execution_id"]),
+                )
+                connection.execute(
+                    """UPDATE node_execution_attempts SET status='completed', completed_at=?, updated_at=?
+                       WHERE execution_id=? AND attempt_number=? AND status='running'""",
+                    (now, now, row["execution_id"], row["attempt_count"]),
+                )
+            connection.execute("COMMIT")
+
+    def fail_node_execution(self, execution_key: str, error_type: str, *, permanent: bool) -> None:
+        """Сохраняет только безопасную классификацию ошибки, без её текста и пользовательских данных."""
+
+        now = self._now()
+        status = "permanent_error" if permanent else "retryable_error"
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT execution_id, attempt_count FROM node_executions WHERE execution_key=?", (execution_key,)
+            ).fetchone()
+            if row is None:
+                connection.execute("ROLLBACK")
+                raise RuntimeError("Ошибка относится к неизвестному выполнению узла.")
+            connection.execute(
+                """UPDATE node_executions
+                   SET status=?, error_type=?, error_message='Детали ошибки не сохраняются.', completed_at=?, updated_at=?
+                   WHERE execution_id=?""",
+                (status, error_type[:160], now, now, row["execution_id"]),
+            )
+            connection.execute(
+                """UPDATE node_execution_attempts SET status=?, error_type=?, completed_at=?, updated_at=?
+                   WHERE execution_id=? AND attempt_number=?""",
+                (status, error_type[:160], now, now, row["execution_id"], row["attempt_count"]),
+            )
+            connection.execute("COMMIT")
+
+    def invalidate_node_execution(self, execution_key: str) -> None:
+        """Отменяет reuse результата, который зависит от уже удалённых временных файлов."""
+
+        with self._connection() as connection:
+            connection.execute(
+                """UPDATE node_executions SET previous_status=status, status='invalidated', updated_at=?
+                   WHERE execution_key=? AND status='completed'""",
+                (self._now(), execution_key),
+            )
+
+    def get_node_execution(
+        self, record: str, node_name: str, *, execution_key: str | None = None
+    ) -> dict[str, Any] | None:
+        query = "SELECT * FROM node_executions WHERE record_id=? AND node_name=?"
+        params: list[str] = [record, node_name]
+        if execution_key is not None:
+            query += " AND execution_key=?"
+            params.append(execution_key)
+        query += " ORDER BY updated_at DESC LIMIT 1"
+        with self._connection() as connection:
+            row = connection.execute(query, params).fetchone()
+        return self._row_execution(row) if row else None
+
+    def node_attempt_history(self, execution_key: str) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                """SELECT attempts.* FROM node_execution_attempts AS attempts
+                   JOIN node_executions AS executions ON executions.execution_id=attempts.execution_id
+                   WHERE executions.execution_key=? ORDER BY attempts.attempt_number""",
+                (execution_key,),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -341,12 +598,5 @@ class ProcessingRepository:
         with self._connection() as connection:
             connection.execute(
                 "INSERT OR REPLACE INTO extraction_cache VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    key,
-                    attachment_sha256,
-                    pipeline_version,
-                    parameters_hash,
-                    json.dumps(result, ensure_ascii=False),
-                    self._now(),
-                ),
+                (key, attachment_sha256, pipeline_version, parameters_hash, self._json(result), self._now()),
             )

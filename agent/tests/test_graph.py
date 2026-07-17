@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from mail_agent.config import AgentSettings, LimitsSettings, RetrySettings
-from mail_agent.exceptions import OCRServiceError, PermanentError
+from mail_agent.exceptions import ExternalServiceError, OCRServiceError, PermanentError
 from mail_agent.graph.builder import MessageGraph
 from mail_agent.models import AttachmentMeta, AttachmentPlan, FinalSummary, MessageReference
 from mail_agent.storage.processing_repository import ProcessingRepository, record_id
@@ -57,6 +57,20 @@ class Workbook:
         return {"remote_path": "/book.xlsx"}
 
 
+class FailingWorkbook(Workbook):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__(events)
+        self.calls = 0
+
+    def upsert(self, result):
+        self.calls += 1
+        self.events.append("table")
+        if self.calls == 1:
+            raise ExternalServiceError("temporary table failure")
+        self.results.append(result)
+        return {"remote_path": "/book.xlsx"}
+
+
 class FailingOCR:
     def __init__(self) -> None:
         self.calls = 0
@@ -88,6 +102,46 @@ class FallbackAnalysis:
 class FailingSummaryAnalysis(Analysis):
     def summarize(self, message, body, attachments, warnings):
         raise PermanentError("Текст письма не должен попасть в диагностику.")
+
+
+class RetryableSummaryAnalysis(Analysis):
+    def __init__(self) -> None:
+        self.summarize_calls = 0
+
+    def summarize(self, message, body, attachments, warnings):
+        self.summarize_calls += 1
+        if self.summarize_calls == 1:
+            raise ExternalServiceError("temporary summary failure")
+        return FinalSummary(summary_ru="итог после повтора", confidence=1)
+
+
+class RetryableReadMail(Mail):
+    def __init__(self) -> None:
+        super().__init__()
+        self.read_calls = 0
+
+    def mark_read(self, uid: str, mailbox: str) -> None:
+        self.read_calls += 1
+        self.events.append("read")
+        if self.read_calls == 1:
+            raise ExternalServiceError("temporary seen failure")
+
+
+class BinaryAttachmentMail(Mail):
+    payload = b"\x00\xff\x01\xfe\x80\x81\x10\x11"
+
+    def fetch_message(self, uid: str, mailbox: str):
+        message = super().fetch_message(uid, mailbox)
+        message["attachments"] = [
+            {"filename": "note.bin", "content_type": "application/octet-stream", "data": self.payload}
+        ]
+        message["text_plain"] = "private-body-marker-must-not-reach-logs"
+        return message
+
+
+class ProgrammaticAttachmentAnalysis(Analysis):
+    def plan(self, meta, parsed):
+        return AttachmentPlan(tool="programmatic", confidence=1, reason="local test extraction")
 
 
 class AttachmentFailureMail(Mail):
@@ -191,7 +245,7 @@ def test_langgraph_recovery_after_table_commit_retries_only_seen(tmp_path) -> No
     finally:
         graph.close()
     assert state["status"] == "completed"
-    assert mail.events == ["fetch", "read"]
+    assert mail.events == ["read"]
     assert repository.get(record_id("INBOX", "1", "<one>"))["status"] == "completed"
 
 
@@ -440,3 +494,175 @@ def test_forwarded_message_uses_original_metadata_and_body(tmp_path) -> None:
         "[Содержимое]\nПросим направить ТКП."
     )
     assert "Письмо является пересылкой" in result["warnings"][0]
+
+
+def test_restart_retries_only_failed_summarization_and_keeps_node_history(tmp_path) -> None:
+    mail = Mail()
+    analysis = RetryableSummaryAnalysis()
+    repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
+    first = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=analysis,
+        workbook=Workbook(mail.events),
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+    )
+    try:
+        failed = first.run(MessageReference(uid="1", mailbox="INBOX", message_id="<one>"), tmp_path / "first")
+    finally:
+        first.close()
+
+    assert failed["status"] == "retryable_error"
+    second = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=analysis,
+        workbook=Workbook(mail.events),
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+    )
+    try:
+        completed = second.run(MessageReference(uid="1", mailbox="INBOX", message_id="<one>"), tmp_path / "second")
+    finally:
+        second.close()
+
+    stable = record_id("INBOX", "1", "<one>")
+    summary = repository.get_node_execution(stable, "summarize_message")
+    assert completed["status"] == "completed"
+    assert mail.events == ["fetch", "table", "read"]
+    assert analysis.summarize_calls == 2
+    assert summary is not None
+    assert summary["status"] == "completed"
+    assert summary["attempt_count"] == 2
+    assert summary["previous_status"] == "retryable_error"
+    assert summary["started_at"] and summary["completed_at"]
+    assert [item["status"] for item in repository.node_attempt_history(str(summary["execution_key"]))] == [
+        "retryable_error",
+        "completed",
+    ]
+
+
+def test_restart_after_table_failure_retries_only_table_and_downstream_nodes(tmp_path) -> None:
+    mail = Mail()
+    analysis = Analysis()
+    repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
+    workbook = FailingWorkbook(mail.events)
+    reference = MessageReference(uid="1", mailbox="INBOX", message_id="<one>")
+    first = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=analysis,
+        workbook=workbook,
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+    )
+    try:
+        assert first.run(reference, tmp_path / "first")["status"] == "retryable_error"
+    finally:
+        first.close()
+    second = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=analysis,
+        workbook=workbook,
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+    )
+    try:
+        assert second.run(reference, tmp_path / "second")["status"] == "completed"
+    finally:
+        second.close()
+
+    assert mail.events == ["fetch", "table", "table", "read"]
+    assert workbook.calls == 2
+
+
+def test_restart_after_table_commit_retries_only_seen_and_complete(tmp_path) -> None:
+    mail = RetryableReadMail()
+    repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
+    workbook = Workbook(mail.events)
+    reference = MessageReference(uid="1", mailbox="INBOX", message_id="<one>")
+    first = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=Analysis(),
+        workbook=workbook,
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+    )
+    try:
+        assert first.run(reference, tmp_path / "first")["status"] == "retryable_error"
+    finally:
+        first.close()
+    second = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=Analysis(),
+        workbook=workbook,
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+    )
+    try:
+        assert second.run(reference, tmp_path / "second")["status"] == "completed"
+    finally:
+        second.close()
+
+    assert mail.events == ["fetch", "table", "read", "read"]
+    assert workbook.results and len(workbook.results) == 1
+    assert repository.get(record_id("INBOX", "1", "<one>"))["status"] == "completed"
+
+
+def test_pipeline_version_and_full_reprocess_invalidate_completed_node_results(tmp_path) -> None:
+    mail = Mail()
+    repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
+    reference = MessageReference(uid="1", mailbox="INBOX", message_id="<one>")
+
+    def run(version: str, directory: str) -> None:
+        graph = MessageGraph(
+            mail=mail,
+            repository=repository,
+            analysis=Analysis(),
+            workbook=Workbook(mail.events),
+            checkpoint_db=tmp_path / "check.sqlite",
+            pipeline_version=version,
+        )
+        try:
+            assert graph.run(reference, tmp_path / directory)["status"] == "completed"
+        finally:
+            graph.close()
+
+    run("1", "first")
+    run("2", "version-change")
+    stable = record_id("INBOX", "1", "<one>")
+    assert repository.requeue_for_reprocess(stable)
+    run("2", "reprocess")
+    assert mail.events == ["fetch", "table", "read", "fetch", "table", "read", "fetch", "table", "read"]
+
+
+def test_binary_payload_is_not_checkpointed_or_logged_and_stale_paths_are_not_reused(tmp_path, caplog) -> None:
+    mail = BinaryAttachmentMail()
+    repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
+    graph = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=ProgrammaticAttachmentAnalysis(),
+        workbook=Workbook(mail.events),
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+    )
+    caplog.set_level(logging.INFO)
+    try:
+        state = graph.run(MessageReference(uid="1", mailbox="INBOX", message_id="<one>"), tmp_path / "work")
+        assert state["attachments"][0]["file_path"] is None
+        assert (
+            graph._hydrate_attachment_paths(
+                {"attachments": [{"sha256": "a" * 64, "file_path": str(tmp_path / "missing-attachment.txt")}]}
+            )
+            == {}
+        )
+    finally:
+        graph.close()
+
+    assert BinaryAttachmentMail.payload not in (tmp_path / "check.sqlite").read_bytes()
+    assert "private-body-marker-must-not-reach-logs" not in caplog.text

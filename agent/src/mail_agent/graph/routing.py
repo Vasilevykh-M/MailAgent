@@ -19,13 +19,21 @@ def route_error(state: MailProcessingState) -> str:
     stage = state.get("failed_stage")
     if not stage:
         return "next"
+    # Временная ошибка не должна превращаться в обычный итог ручной проверки:
+    # checkpoint и журнал позволяют повторить именно упавший узел.
+    if state.get("status") == "retryable_error":
+        return "failure"
     return "manual_review" if stage in _MANUAL_REVIEW_STAGES else "failure"
 
 
 def route_after_check(state: MailProcessingState) -> str:
     if state.get("failed_stage"):
         return "failure"
-    return "end" if state.get("status") == "completed" else "fetch"
+    if state.get("status") == "completed":
+        return "end"
+    # После подтверждённой записи в Excel нельзя снова получать, анализировать или
+    # сохранять письмо: остаются только `mark_message_as_read` и `complete`.
+    return "mark" if state.get("status") == "table_committed" else "fetch"
 
 
 def route_after_fetch(state: MailProcessingState) -> str:

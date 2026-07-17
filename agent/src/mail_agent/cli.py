@@ -136,11 +136,7 @@ def main(argv: list[str] | None = None) -> int:
                                 "Для повторной обработки не найдена завершённая или упавшая запись письма."
                             )
                         record = str(item["record_id"])
-                        requeued = (
-                            runtime.worker.repository.requeue_completed(record)
-                            if item["status"] == "completed"
-                            else runtime.worker.repository.requeue_failed(record, include_permanent=True)
-                        )
+                        requeued = runtime.worker.repository.requeue_for_reprocess(record)
                         if not requeued:
                             raise RuntimeError("Не удалось вернуть письмо в очередь повторной обработки.")
                         log_event(
