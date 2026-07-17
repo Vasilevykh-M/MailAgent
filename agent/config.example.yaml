@@ -1,0 +1,39 @@
+work_dir: ./var/mail-agent
+db_path: ./var/mail-agent/state.sqlite3
+checkpoint_db_path: ./var/mail-agent/checkpoints.sqlite3
+mail_env_file: ./yandex/mail/.env
+drive_env_file: ./yandex/drive/.env
+mail:
+  mailbox: INBOX
+  poll_interval_seconds: 60
+  unread_only: true
+  batch_size: 50
+  max_concurrent_messages: 1
+  mark_read_after_success: true
+llm:
+  base_url: http://127.0.0.1:8001/v1
+  model: ""
+  # Количество попыток получить итоговую сводку до сокращённого fallback.
+  final_summary_attempts: 3
+  # Общий лимит текста письма и вложений в одном запросе к vLLM.
+  max_text_chars_per_request: 8000
+  max_completion_tokens: 1200
+  # Коррекция OCR возвращает текст целиком, поэтому её лимит выше общего.
+  max_ocr_correction_tokens: 3000
+  max_image_bytes_per_request: 4194304
+ocr:
+  base_url: http://127.0.0.1:8000
+  # При ошибке OCR попытаться извлечь PDF/изображения через VLM.
+  fallback_to_vlm: true
+table:
+  remote_path: /mail-agent/mail-register.xlsx
+  sheet_name: Письма
+  create_if_missing: false
+  save_full_report: true
+  report_directory: /mail-agent/reports
+dashboard:
+  # Панель намеренно доступна только с локального компьютера.
+  host: 127.0.0.1
+  port: 8765
+  queue_limit: 100
+  recent_limit: 30

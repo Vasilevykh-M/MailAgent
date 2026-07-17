@@ -1,0 +1,14 @@
+[project]
+name = "qwen36-ray-vllm-service"
+version = "0.2.0"
+description = "Two-node native Ray/vLLM service for Qwen3.6-27B-FP8"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "openai==2.44.0",
+  "ray[cgraph]==2.56.0",
+  "vllm==0.24.0",
+]
+
+[tool.uv]
+package = false

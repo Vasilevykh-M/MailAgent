@@ -1,0 +1,10 @@
+config.mk
+.venv/
+cache/
+logs/
+run/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.DS_Store

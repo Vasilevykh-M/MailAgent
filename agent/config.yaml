@@ -1,0 +1,83 @@
+# Core запускается на этом Mac. LLM и OCR доступны через VPN на GPU-сервере.
+work_dir: /Users/mvasilevykh/Desktop/scripts/mail_agent/var/mail-agent
+db_path: /Users/mvasilevykh/Desktop/scripts/mail_agent/var/mail-agent/state.sqlite3
+checkpoint_db_path: /Users/mvasilevykh/Desktop/scripts/mail_agent/var/mail-agent/checkpoints.sqlite3
+
+mail_env_file: /Users/mvasilevykh/Desktop/scripts/mail_agent/yandex/mail/.env
+drive_env_file: /Users/mvasilevykh/Desktop/scripts/mail_agent/yandex/drive/.env
+log_level: INFO
+pipeline_version: "1"
+
+mail:
+  mailbox: INBOX
+  poll_interval_seconds: 60
+  unread_only: true
+  batch_size: 50
+  max_concurrent_messages: 1
+  mark_read_after_success: true
+  max_message_size: 26214400
+
+llm:
+  base_url: http://192.14.88.2:8001/v1
+  # Оставлено пустым: модель будет получена из GET /v1/models.
+  model: ""
+  timeout_seconds: 180
+  max_retries: 3
+  # Полных попыток итоговой сводки до сокращённого режима.
+  final_summary_attempts: 4
+  max_concurrent_requests: 1
+  max_images_per_request: 2
+  # Общий лимит текста письма и вложений в одном запросе к vLLM.
+  max_text_chars_per_request: 8000
+  max_completion_tokens: 1200
+  # Коррекция OCR возвращает текст целиком, поэтому её лимит выше общего.
+  max_ocr_correction_tokens: 3000
+  max_image_bytes_per_request: 4194304
+
+ocr:
+  base_url: http://192.14.88.2:8000
+  # При ошибке OCR попытаться извлечь PDF/изображения через VLM.
+  fallback_to_vlm: true
+  timeout_seconds: 300
+  max_retries: 3
+  max_concurrent_requests: 1
+  capabilities_cache_ttl_seconds: 300
+
+table:
+  # Корень Яндекс Диска всегда существует; агент создаст книгу при первом запуске.
+  remote_path: /mail-register.xlsx
+  sheet_name: Письма
+  header_row: 1
+  create_if_missing: true
+  update_existing: true
+  max_conflict_retries: 3
+  save_full_report: true
+  # Корень существует всегда; отчёты сохраняются как /<record_id>.md.
+  report_directory: /
+
+limits:
+  max_attachment_size: 26214400
+  max_attachments_per_message: 30
+  max_pdf_pages: 50
+  max_pptx_slides: 100
+  max_xlsx_sheets: 20
+  max_xlsx_rows: 10000
+  max_xlsx_columns: 100
+  max_parallel_attachments: 1
+  # Размер фрагмента текста вложения для поэтапной суммаризации через vLLM.
+  chunk_size: 4000
+  # Верхняя граница запросов к LLM на одно очень большое вложение.
+  max_attachment_summary_chunks: 24
+
+retries:
+  max_attempts: 5
+  base_backoff_seconds: 15
+  max_backoff_seconds: 900
+  permanent_error_retry: false
+
+# Панель доступна только с этого Mac: http://127.0.0.1:8765
+dashboard:
+  host: 127.0.0.1
+  port: 8765
+  queue_limit: 100
+  recent_limit: 30

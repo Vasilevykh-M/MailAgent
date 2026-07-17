@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paddleocr-fastapi-service"
+version = "1.0.0"
+description = "Production-oriented FastAPI service for PaddleOCR and PP-StructureV3"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "fastapi==0.115.12",
+  "numpy==2.2.6",
+  "paddleocr[doc-parser]==3.7.0",
+  "paddlepaddle==3.3.0",
+  "pillow==11.2.1",
+  "pydantic==2.11.5",
+  "pydantic-settings==2.9.1",
+  "pypdf==5.5.0",
+  "python-multipart==0.0.20",
+  "uvicorn[standard]==0.34.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx==0.28.1",
+  "pytest==8.3.5",
+  "ruff==0.11.10",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+  "integration: a real PaddleOCR smoke test; skipped unless explicitly enabled",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = ["models"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/api/routes/*.py" = ["B008"]
