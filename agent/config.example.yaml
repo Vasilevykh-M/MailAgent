@@ -2,7 +2,6 @@ work_dir: ./var/mail-agent
 db_path: ./var/mail-agent/state.sqlite3
 checkpoint_db_path: ./var/mail-agent/checkpoints.sqlite3
 mail_env_file: ./yandex/mail/.env
-drive_env_file: ./yandex/drive/.env
 mail:
   mailbox: INBOX
   poll_interval_seconds: 60
@@ -25,12 +24,13 @@ ocr:
   base_url: http://127.0.0.1:8000
   # При ошибке OCR попытаться извлечь PDF/изображения через VLM.
   fallback_to_vlm: true
-table:
-  remote_path: /mail-agent/mail-register.xlsx
-  sheet_name: Письма
-  create_if_missing: false
-  save_full_report: true
-  report_directory: /mail-agent/reports
+results_api:
+  base_url: http://127.0.0.1:8080
+  # Ключ остаётся пустым: передавайте RESULTS_API_KEY только через окружение.
+  api_key: ""
+  timeout_seconds: 300
+  max_retries: 3
+  verify_tls: true
 dashboard:
   # Панель намеренно доступна только с локального компьютера.
   host: 127.0.0.1

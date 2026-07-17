@@ -6,12 +6,11 @@ from dataclasses import dataclass
 
 from .clients.llm import LLMClient
 from .clients.ocr import OCRClient
+from .clients.results_api import ResultsAPIClient
 from .config import AgentSettings
 from .graph.builder import MessageGraph
-from .integrations.drive import YandexDriveAdapter
 from .integrations.mail import YandexMailAdapter
 from .storage.processing_repository import ProcessingRepository
-from .storage.workbook import WorkbookRepository
 from .summarization.service import AnalysisService
 from .worker import PollingWorker
 
@@ -21,27 +20,28 @@ class Runtime:
     worker: PollingWorker
     llm: LLMClient
     ocr: OCRClient
+    results_api: ResultsAPIClient
     graph: MessageGraph
 
     def close(self) -> None:
         self.graph.close()
         self.llm.close()
         self.ocr.close()
+        self.results_api.close()
 
 
 def build_runtime(settings: AgentSettings) -> Runtime:
     settings.prepare_directories()
     mail = YandexMailAdapter(settings.mail_env_file)
-    drive = YandexDriveAdapter(settings.drive_env_file)
     llm, ocr = LLMClient(settings.llm), OCRClient(settings.ocr)
+    results_api = ResultsAPIClient(settings.results_api)
     repository = ProcessingRepository(settings.db_path, settings.retries)
     analysis = AnalysisService(settings, llm, ocr)
-    workbook = WorkbookRepository(drive, settings.table)
     graph = MessageGraph(
         mail=mail,
         repository=repository,
         analysis=analysis,
-        workbook=workbook,
+        results_api=results_api,
         checkpoint_db=settings.checkpoint_db_path,
         pipeline_version=settings.pipeline_version,
     )
@@ -55,4 +55,4 @@ def build_runtime(settings: AgentSettings) -> Runtime:
         poll_interval_seconds=settings.mail.poll_interval_seconds,
         max_concurrent_messages=settings.mail.max_concurrent_messages,
     )
-    return Runtime(worker, llm, ocr, graph)
+    return Runtime(worker, llm, ocr, results_api, graph)

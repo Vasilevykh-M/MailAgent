@@ -11,7 +11,7 @@ _MANUAL_REVIEW_STAGES = {
     "process_attachments",
     "validate_extractions",
     "summarize_message",
-    "prepare_table_record",
+    "prepare_api_record",
 }
 
 
@@ -31,12 +31,11 @@ def route_after_check(state: MailProcessingState) -> str:
         return "failure"
     if state.get("status") == "completed":
         return "end"
-    # После подтверждённой записи в Excel нельзя снова получать, анализировать или
-    # сохранять письмо: остаются только `mark_message_as_read` и `complete`.
-    return "mark" if state.get("status") == "table_committed" else "fetch"
+    # После подтверждённого API commit не повторяем OCR/LLM: остаются только `\Seen` и `complete`.
+    return "mark" if state.get("status") == "result_committed" else "fetch"
 
 
 def route_after_fetch(state: MailProcessingState) -> str:
     if state.get("failed_stage"):
         return "failure"
-    return "mark" if state.get("status") == "table_committed" else "next"
+    return "mark" if state.get("status") == "result_committed" else "next"

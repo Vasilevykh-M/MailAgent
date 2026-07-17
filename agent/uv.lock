@@ -602,7 +602,6 @@ dependencies = [
     { name = "python-pptx" },
     { name = "pyyaml" },
     { name = "xlrd" },
-    { name = "yandex-drive-sdk" },
     { name = "yandex-mail-sdk" },
 ]
 
@@ -631,7 +630,6 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
     { name = "xlrd", specifier = ">=2.0.1" },
-    { name = "yandex-drive-sdk", editable = "../yandex/drive" },
     { name = "yandex-mail-sdk", editable = "../yandex/mail" },
 ]
 provides-extras = ["dev"]
@@ -1617,24 +1615,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/a3/56864d895d1161a9f17502088e9c1fb7c06bde2c2efdde620d22bb7a9c43/xxhash-3.8.1-pp311-pypy311_pp73-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:49aa8692507835dcc1e8ad8021f20c74c2dc13d83b5112e87877faa2a0035b20", size = 34448, upload-time = "2026-07-06T10:49:53.242Z" },
     { url = "https://files.pythonhosted.org/packages/6b/57/5c6e0908a47f61dca96d01c8ee6fce01ed1050611eb779083ba8758fed81/xxhash-3.8.1-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:345b07b78e2bf583d71682aa34ae5b5fab575f7a1cb31e10263ebbc6f89f8c42", size = 32869, upload-time = "2026-07-06T10:49:55.972Z" },
 ]
-
-[[package]]
-name = "yandex-drive-sdk"
-version = "0.1.0"
-source = { editable = "../yandex/drive" }
-dependencies = [
-    { name = "python-dotenv" },
-    { name = "requests" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5" },
-    { name = "python-dotenv", specifier = ">=1.0" },
-    { name = "requests", specifier = ">=2.31" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "yandex-mail-sdk"

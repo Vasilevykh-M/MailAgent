@@ -109,7 +109,9 @@ class MailProcessingState(TypedDict, total=False):
     attachment_plans: list[dict[str, Any]]
     attachment_results: list[dict[str, Any]]
     summary: dict[str, Any] | None
-    table_result: dict[str, Any] | None
+    api_record: dict[str, Any] | None
+    api_commit_result: dict[str, Any] | None
+    raw_email_path: str | None
     attempts: dict[str, int]
     warnings: list[str]
     errors: list[dict[str, str]]

@@ -24,6 +24,7 @@ class Mail:
             "headers": [["X", "Y"], ["X", "Z"]],
             "text_plain": "body",
             "text_html": "<p>html</p>",
+            "raw_bytes": b"From: sender@example.test\r\nSubject: subject\r\n\r\nbody",
             "attachments": [],
             "flags": [],
             "from": "sender",
@@ -46,29 +47,41 @@ class Analysis:
         return FinalSummary(summary_ru="итог", confidence=1)
 
 
-class Workbook:
+class ResultsAPI:
     def __init__(self, events: list[str]) -> None:
         self.events = events
         self.results: list[dict[str, object]] = []
 
-    def upsert(self, result):
-        self.events.append("table")
-        self.results.append(result)
-        return {"remote_path": "/book.xlsx"}
+    def persist(self, payload, *, raw_email_path, attachment_paths):
+        del raw_email_path, attachment_paths
+        self.events.append("api")
+        self.results.append(
+            {
+                "summary": payload["agent_result"]["summary"],
+                "attachments": payload["agent_result"]["attachments"],
+            }
+        )
+        return SimpleNamespace(model_dump=lambda mode="json": {"status": "committed", "storage_verified": True})
 
 
-class FailingWorkbook(Workbook):
+class FailingResultsAPI(ResultsAPI):
     def __init__(self, events: list[str]) -> None:
         super().__init__(events)
         self.calls = 0
 
-    def upsert(self, result):
+    def persist(self, payload, *, raw_email_path, attachment_paths):
         self.calls += 1
-        self.events.append("table")
+        self.events.append("api")
         if self.calls == 1:
-            raise ExternalServiceError("temporary table failure")
-        self.results.append(result)
-        return {"remote_path": "/book.xlsx"}
+            raise ExternalServiceError("temporary Results API failure")
+        del raw_email_path, attachment_paths
+        self.results.append(
+            {
+                "summary": payload["agent_result"]["summary"],
+                "attachments": payload["agent_result"]["attachments"],
+            }
+        )
+        return SimpleNamespace(model_dump=lambda mode="json": {"status": "committed", "storage_verified": True})
 
 
 class FailingOCR:
@@ -206,14 +219,14 @@ def _image_attachment(path: Path) -> AttachmentMeta:
     )
 
 
-def test_langgraph_commits_table_before_seen_and_preserves_duplicate_headers(tmp_path) -> None:
+def test_langgraph_commits_api_before_seen_and_preserves_duplicate_headers(tmp_path) -> None:
     mail = Mail()
     repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
     graph = MessageGraph(
         mail=mail,
         repository=repository,
         analysis=Analysis(),
-        workbook=Workbook(mail.events),
+        results_api=ResultsAPI(mail.events),
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -222,21 +235,21 @@ def test_langgraph_commits_table_before_seen_and_preserves_duplicate_headers(tmp
     finally:
         graph.close()
     assert state["status"] == "completed"
-    assert mail.events == ["fetch", "table", "read"]
+    assert mail.events == ["fetch", "api", "read"]
     assert state["message_metadata"]["headers"] == [["X", "Y"], ["X", "Z"]]
 
 
-def test_langgraph_recovery_after_table_commit_retries_only_seen(tmp_path) -> None:
+def test_langgraph_recovery_after_result_commit_retries_only_seen(tmp_path) -> None:
     mail = Mail()
     repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
     stable = repository.ensure("INBOX", "1", "<one>", "1")
     repository.start(stable)
-    repository.table_committed(stable, {"remote_path": "/book.xlsx"})
+    repository.result_committed(stable, {"request_id": "test"})
     graph = MessageGraph(
         mail=mail,
         repository=repository,
         analysis=Analysis(),
-        workbook=Workbook(mail.events),
+        results_api=ResultsAPI(mail.events),
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -251,13 +264,13 @@ def test_langgraph_recovery_after_table_commit_retries_only_seen(tmp_path) -> No
 
 def test_graph_writes_manual_review_record_when_summarization_fails(tmp_path, caplog) -> None:
     mail = Mail()
-    workbook = Workbook(mail.events)
+    results_api = ResultsAPI(mail.events)
     repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
     graph = MessageGraph(
         mail=mail,
         repository=repository,
         analysis=FailingSummaryAnalysis(),
-        workbook=workbook,
+        results_api=results_api,
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -270,13 +283,13 @@ def test_graph_writes_manual_review_record_when_summarization_fails(tmp_path, ca
     item = repository.get(record_id("INBOX", "1", "<one>"))
     assert item is not None
     assert state["status"] == "completed"
-    assert mail.events == ["fetch", "table", "read"]
+    assert mail.events == ["fetch", "api", "read"]
     assert item["status"] == "completed"
     assert item["requires_manual_review"] == 1
     assert item["manual_review_stage"] == "summarize_message"
     assert item["manual_review_error_type"] == "PermanentError"
     assert state["summary"]["summary_ru"] == "Автоматическая обработка не завершена. Письмо требует ручной проверки."
-    assert workbook.results[-1]["summary"]["confidence"] == 0
+    assert results_api.results[-1]["summary"]["confidence"] == 0
     assert state["errors"][-1] == {"stage": "summarize_message", "type": "PermanentError"}
     assert "manual_review_record_created" in [record.getMessage() for record in caplog.records]
     assert "Текст письма не должен" not in caplog.text
@@ -289,7 +302,7 @@ def test_manual_review_names_unprocessed_attachments_without_extracted_text(tmp_
         mail=Mail(),
         repository=repository,
         analysis=Analysis(),
-        workbook=Workbook([]),
+        results_api=ResultsAPI([]),
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -324,12 +337,12 @@ def test_attachment_failure_keeps_forwarded_email_summary_flow(tmp_path) -> None
     mail = AttachmentFailureMail()
     analysis = AttachmentFailureAnalysis()
     repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
-    workbook = Workbook(mail.events)
+    results_api = ResultsAPI(mail.events)
     graph = MessageGraph(
         mail=mail,
         repository=repository,
         analysis=analysis,
-        workbook=workbook,
+        results_api=results_api,
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -339,7 +352,7 @@ def test_attachment_failure_keeps_forwarded_email_summary_flow(tmp_path) -> None
         graph.close()
 
     assert state["status"] == "completed"
-    assert mail.events == ["fetch", "table", "read"]
+    assert mail.events == ["fetch", "api", "read"]
     assert "Просим направить ТКП до конца недели." in analysis.received_body
     assert len(analysis.received_attachments) == 2
     assert analysis.received_attachments[0]["status"] == "skipped"
@@ -364,7 +377,7 @@ def test_graph_logs_stage_lifecycle_without_message_body(tmp_path, caplog) -> No
         mail=mail,
         repository=repository,
         analysis=Analysis(),
-        workbook=Workbook(mail.events),
+        results_api=ResultsAPI(mail.events),
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -390,7 +403,7 @@ def test_ocr_service_failure_uses_vlm_fallback_for_image(tmp_path) -> None:
         mail=mail,
         repository=repository,
         analysis=analysis,
-        workbook=Workbook(mail.events),
+        results_api=ResultsAPI(mail.events),
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -432,7 +445,7 @@ def test_ocr_capabilities_failure_plans_vlm_fallback(tmp_path) -> None:
         mail=mail,
         repository=repository,
         analysis=analysis,
-        workbook=Workbook(mail.events),
+        results_api=ResultsAPI(mail.events),
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -454,7 +467,7 @@ def test_forwarded_message_uses_original_metadata_and_body(tmp_path) -> None:
         mail=mail,
         repository=repository,
         analysis=Analysis(),
-        workbook=Workbook(mail.events),
+        results_api=ResultsAPI(mail.events),
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -504,7 +517,7 @@ def test_restart_retries_only_failed_summarization_and_keeps_node_history(tmp_pa
         mail=mail,
         repository=repository,
         analysis=analysis,
-        workbook=Workbook(mail.events),
+        results_api=ResultsAPI(mail.events),
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -518,7 +531,7 @@ def test_restart_retries_only_failed_summarization_and_keeps_node_history(tmp_pa
         mail=mail,
         repository=repository,
         analysis=analysis,
-        workbook=Workbook(mail.events),
+        results_api=ResultsAPI(mail.events),
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -530,7 +543,7 @@ def test_restart_retries_only_failed_summarization_and_keeps_node_history(tmp_pa
     stable = record_id("INBOX", "1", "<one>")
     summary = repository.get_node_execution(stable, "summarize_message")
     assert completed["status"] == "completed"
-    assert mail.events == ["fetch", "table", "read"]
+    assert mail.events == ["fetch", "api", "read"]
     assert analysis.summarize_calls == 2
     assert summary is not None
     assert summary["status"] == "completed"
@@ -543,17 +556,17 @@ def test_restart_retries_only_failed_summarization_and_keeps_node_history(tmp_pa
     ]
 
 
-def test_restart_after_table_failure_retries_only_table_and_downstream_nodes(tmp_path) -> None:
+def test_restart_after_api_failure_retries_only_api_and_downstream_nodes(tmp_path) -> None:
     mail = Mail()
     analysis = Analysis()
     repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
-    workbook = FailingWorkbook(mail.events)
+    results_api = FailingResultsAPI(mail.events)
     reference = MessageReference(uid="1", mailbox="INBOX", message_id="<one>")
     first = MessageGraph(
         mail=mail,
         repository=repository,
         analysis=analysis,
-        workbook=workbook,
+        results_api=results_api,
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -565,7 +578,7 @@ def test_restart_after_table_failure_retries_only_table_and_downstream_nodes(tmp
         mail=mail,
         repository=repository,
         analysis=analysis,
-        workbook=workbook,
+        results_api=results_api,
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -574,20 +587,20 @@ def test_restart_after_table_failure_retries_only_table_and_downstream_nodes(tmp
     finally:
         second.close()
 
-    assert mail.events == ["fetch", "table", "table", "read"]
-    assert workbook.calls == 2
+    assert mail.events == ["fetch", "api", "api", "read"]
+    assert results_api.calls == 2
 
 
-def test_restart_after_table_commit_retries_only_seen_and_complete(tmp_path) -> None:
+def test_restart_after_api_commit_retries_only_seen_and_complete(tmp_path) -> None:
     mail = RetryableReadMail()
     repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
-    workbook = Workbook(mail.events)
+    results_api = ResultsAPI(mail.events)
     reference = MessageReference(uid="1", mailbox="INBOX", message_id="<one>")
     first = MessageGraph(
         mail=mail,
         repository=repository,
         analysis=Analysis(),
-        workbook=workbook,
+        results_api=results_api,
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -599,7 +612,7 @@ def test_restart_after_table_commit_retries_only_seen_and_complete(tmp_path) -> 
         mail=mail,
         repository=repository,
         analysis=Analysis(),
-        workbook=workbook,
+        results_api=results_api,
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -608,8 +621,8 @@ def test_restart_after_table_commit_retries_only_seen_and_complete(tmp_path) -> 
     finally:
         second.close()
 
-    assert mail.events == ["fetch", "table", "read", "read"]
-    assert workbook.results and len(workbook.results) == 1
+    assert mail.events == ["fetch", "api", "read", "read"]
+    assert results_api.results and len(results_api.results) == 1
     assert repository.get(record_id("INBOX", "1", "<one>"))["status"] == "completed"
 
 
@@ -623,7 +636,7 @@ def test_pipeline_version_and_full_reprocess_invalidate_completed_node_results(t
             mail=mail,
             repository=repository,
             analysis=Analysis(),
-            workbook=Workbook(mail.events),
+            results_api=ResultsAPI(mail.events),
             checkpoint_db=tmp_path / "check.sqlite",
             pipeline_version=version,
         )
@@ -637,7 +650,7 @@ def test_pipeline_version_and_full_reprocess_invalidate_completed_node_results(t
     stable = record_id("INBOX", "1", "<one>")
     assert repository.requeue_for_reprocess(stable)
     run("2", "reprocess")
-    assert mail.events == ["fetch", "table", "read", "fetch", "table", "read", "fetch", "table", "read"]
+    assert mail.events == ["fetch", "api", "read", "fetch", "api", "read", "fetch", "api", "read"]
 
 
 def test_binary_payload_is_not_checkpointed_or_logged_and_stale_paths_are_not_reused(tmp_path, caplog) -> None:
@@ -647,7 +660,7 @@ def test_binary_payload_is_not_checkpointed_or_logged_and_stale_paths_are_not_re
         mail=mail,
         repository=repository,
         analysis=ProgrammaticAttachmentAnalysis(),
-        workbook=Workbook(mail.events),
+        results_api=ResultsAPI(mail.events),
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -665,4 +678,5 @@ def test_binary_payload_is_not_checkpointed_or_logged_and_stale_paths_are_not_re
         graph.close()
 
     assert BinaryAttachmentMail.payload not in (tmp_path / "check.sqlite").read_bytes()
+    assert b"From: sender@example.test" not in (tmp_path / "check.sqlite").read_bytes()
     assert "private-body-marker-must-not-reach-logs" not in caplog.text

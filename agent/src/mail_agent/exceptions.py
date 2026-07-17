@@ -37,3 +37,11 @@ class ExternalServiceError(RetryableError):
 
 class OCRServiceError(ExternalServiceError):
     """OCR-сервис недоступен или нарушил свой HTTP-контракт."""
+
+
+class ResultsAPIError(ExternalServiceError):
+    """Results API не подтвердил сохранение результата."""
+
+
+class ResultsAPIPermanentError(PermanentError):
+    """Results API отклонил данные как некорректные или конфликтные."""

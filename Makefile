@@ -1,19 +1,19 @@
 AGENT_DIR ?= ./agent
 MAIL_DIR ?= ./yandex/mail
-DRIVE_DIR ?= ./yandex/drive
+API_DIR ?= ./api-service
 LLM_DIR ?= ./llm-service
 OCR_DIR ?= ./ocr-service
 PROFILE ?= core
 UV_CACHE_DIR ?= /private/tmp/mail-agent-uv-cache
 
 .DEFAULT_GOAL := help
-.PHONY: help install auth-mail auth-drive health health-core health-ai run once worker dashboard process retry-failed start stop status test lint typecheck check clean
+.PHONY: help install auth-mail health health-core health-ai run once worker dashboard process retry-failed start stop status test lint typecheck check clean infra-up infra-down infra-status api-migrate api-test api-lint api-typecheck health-data
 
 help:
-	@printf '%s\n' 'make install PROFILE=core|ai|all' 'make auth-mail | auth-drive' 'make health PROFILE=core|ai|all' 'make run PROFILE=core|ai|all' 'make once | worker | dashboard | process UID=123 MAILBOX=INBOX | retry-failed' 'make start|stop|status PROFILE=ai' 'make test | lint | typecheck | check | clean'
+	@printf '%s\n' 'make install PROFILE=core|ai|all' 'make auth-mail' 'make health PROFILE=core|ai|all' 'make run PROFILE=core|ai|all' 'make once | worker | dashboard | process UID=123 MAILBOX=INBOX | retry-failed' 'make infra-up | infra-down | infra-status | api-migrate | api-test | api-lint | api-typecheck | health-data' 'make test | lint | typecheck | check | clean'
 
 install:
-	@test -d "$(AGENT_DIR)" && test -d "$(MAIL_DIR)" && test -d "$(DRIVE_DIR)"
+	@test -d "$(AGENT_DIR)" && test -d "$(MAIL_DIR)"
 	@echo "Installing profile $(PROFILE)"
 	@if [ "$(PROFILE)" = core ] || [ "$(PROFILE)" = all ]; then UV_CACHE_DIR="$(UV_CACHE_DIR)" uv sync --project "$(AGENT_DIR)" --extra dev --python 3.11; fi
 	@if [ "$(PROFILE)" = ai ] || [ "$(PROFILE)" = all ]; then test -d "$(LLM_DIR)" && test -d "$(OCR_DIR)"; UV_CACHE_DIR="$(UV_CACHE_DIR)" uv sync --project "$(OCR_DIR)" --extra dev --python 3.11; fi
@@ -21,9 +21,6 @@ install:
 
 auth-mail:
 	@UV_CACHE_DIR="$(UV_CACHE_DIR)" uv run --project "$(AGENT_DIR)" yandex-mail --env "$(MAIL_DIR)/.env" auth
-
-auth-drive:
-	@UV_CACHE_DIR="$(UV_CACHE_DIR)" uv run --project "$(AGENT_DIR)" yandex-drive --env "$(DRIVE_DIR)/.env" auth
 
 health: health-$(PROFILE)
 health-core:
@@ -72,3 +69,28 @@ typecheck:
 check: lint typecheck test
 clean:
 	@rm -rf "$(AGENT_DIR)/.venv" "$(AGENT_DIR)/.pytest_cache" "$(AGENT_DIR)/.ruff_cache" "$(AGENT_DIR)/.mypy_cache" "$(AGENT_DIR)/var"
+
+infra-up:
+	@docker compose up --build --detach postgres minio minio-init api-service
+
+infra-down:
+	@docker compose down
+
+infra-status:
+	@docker compose ps
+
+api-migrate:
+	@docker compose run --rm api-service uv run alembic upgrade head
+
+api-test:
+	@cd "$(API_DIR)" && UV_CACHE_DIR="$(UV_CACHE_DIR)" uv run --extra dev pytest
+
+api-lint:
+	@cd "$(API_DIR)" && UV_CACHE_DIR="$(UV_CACHE_DIR)" uv run --extra dev ruff format --check app tests
+	@cd "$(API_DIR)" && UV_CACHE_DIR="$(UV_CACHE_DIR)" uv run --extra dev ruff check app tests
+
+api-typecheck:
+	@cd "$(API_DIR)" && UV_CACHE_DIR="$(UV_CACHE_DIR)" uv run --extra dev mypy app
+
+health-data:
+	@docker compose exec api-service uv run python -c "import httpx; response=httpx.get('http://127.0.0.1:8080/health/ready', timeout=5); response.raise_for_status(); print(response.json()['status'])"

@@ -80,6 +80,8 @@ class YandexMailAdapter:
             "size_bytes": message.size_bytes,
             "text_plain": message.text_plain or "",
             "text_html": message.text_html or "",
+            # Единственный путь к исходному MIME: graph немедленно переносит bytes во временный файл.
+            "raw_bytes": message.raw_bytes,
             "attachments": [
                 {
                     "filename": item.filename,

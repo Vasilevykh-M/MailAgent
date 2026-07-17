@@ -57,9 +57,9 @@ def _doctor(settings: AgentSettings) -> int:
             "work_directory": Path(settings.work_dir).is_dir(),
             "sqlite": Path(settings.db_path).exists(),
             "mail_sdk_import": True,
-            "drive_sdk_import": True,
             "llm_health": _safe_check(runtime.llm.health),
             "ocr_health": _safe_check(runtime.ocr.health),
+            "results_api_health": _safe_check(runtime.results_api.health),
         }
         checks["llm_models"] = checks["llm_health"] and _safe_check(lambda: bool(runtime.llm.models()))
         checks["ocr_capabilities"] = checks["ocr_health"] and _safe_check(lambda: bool(runtime.ocr.capabilities()))
@@ -68,13 +68,6 @@ def _doctor(settings: AgentSettings) -> int:
             checks["mail_authorization"] = True
         except Exception:
             checks["mail_authorization"] = False
-        try:
-            runtime.graph.workbook.drive.metadata(settings.table.remote_path)
-            checks["workbook"] = True
-            checks["drive_authorization"] = True
-        except Exception:
-            checks["workbook"] = False
-            checks["drive_authorization"] = False
         print(json.dumps(checks, ensure_ascii=False))
         return 0 if all(checks.values()) else 1
     finally:

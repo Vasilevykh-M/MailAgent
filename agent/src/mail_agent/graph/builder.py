@@ -5,11 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import tempfile
 import time
 import uuid
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 import fitz
 from langgraph.graph import END, START, StateGraph
@@ -17,7 +19,7 @@ from pydantic import BaseModel, Field
 
 from ..attachments.parsers import ParsedText, extract_programmatic, sanitize_html
 from ..attachments.validation import build_metadata
-from ..exceptions import OCRServiceError, PermanentError
+from ..exceptions import OCRServiceError, PermanentError, ResultsAPIError
 from ..integrations.mail import MailGateway
 from ..logging import log_event
 from ..messages.forwarded import extract_forwarded_chain, format_forwarded_chain
@@ -30,7 +32,6 @@ from ..models import (
     MessageReference,
 )
 from ..storage.processing_repository import ProcessingRepository, record_id
-from ..storage.workbook import WorkbookRepository
 from ..summarization.prompts import UNTRUSTED_DATA_RULES
 from ..summarization.service import AnalysisService
 from .routing import route_after_check, route_after_fetch, route_error
@@ -46,8 +47,8 @@ _LOGICAL_NODES = (
     "process_attachments",
     "validate_extractions",
     "summarize_message",
-    "prepare_table_record",
-    "update_yandex_disk_table",
+    "prepare_api_record",
+    "persist_result_via_api",
     "commit_processing_state",
     "mark_message_as_read",
     "complete",
@@ -57,6 +58,7 @@ _EPHEMERAL_STATE_KEYS = {
     "temporary_dir",
     "attachment_payloads",
     "attachment_paths",
+    "raw_email_path",
     "attempts",
     "errors",
     "status",
@@ -66,8 +68,13 @@ _EPHEMERAL_STATE_KEYS = {
     "pending_node_name",
     "pending_execution_key",
 }
-_EPHEMERAL_VALUE_KEYS = {"file_path", "path", "pending_node_name", "pending_execution_key"}
-_ATTACHMENT_BYTE_NODES = {"collect_attachment_metadata", "plan_attachments", "process_attachments"}
+_EPHEMERAL_VALUE_KEYS = {"file_path", "path", "raw_email_path", "pending_node_name", "pending_execution_key"}
+_ATTACHMENT_BYTE_NODES = {
+    "collect_attachment_metadata",
+    "plan_attachments",
+    "process_attachments",
+    "persist_result_via_api",
+}
 
 
 class VisionResult(BaseModel):
@@ -77,6 +84,10 @@ class VisionResult(BaseModel):
     confidence: float = Field(ge=0, le=1)
 
 
+class ResultsGateway(Protocol):
+    def persist(self, payload: dict[str, Any], *, raw_email_path: Path, attachment_paths: dict[str, str]) -> Any: ...
+
+
 class MessageGraph:
     def __init__(
         self,
@@ -84,11 +95,11 @@ class MessageGraph:
         mail: MailGateway,
         repository: ProcessingRepository,
         analysis: AnalysisService,
-        workbook: WorkbookRepository,
+        results_api: ResultsGateway,
         checkpoint_db: Path,
         pipeline_version: str,
     ) -> None:
-        self.mail, self.repository, self.analysis, self.workbook = mail, repository, analysis, workbook
+        self.mail, self.repository, self.analysis, self.results_api = mail, repository, analysis, results_api
         self.pipeline_version = pipeline_version
         checkpoint_db.parent.mkdir(parents=True, exist_ok=True)
         # Import is delayed so local non-AI commands still produce a clear dependency error.
@@ -142,17 +153,26 @@ class MessageGraph:
 
     @staticmethod
     def _paths_exist(payloads: object) -> bool:
-        if not isinstance(payloads, list) or not payloads:
+        if not isinstance(payloads, list):
             return False
         return all(
             isinstance(item, dict) and isinstance(item.get("path"), str) and Path(item["path"]).is_file()
             for item in payloads
         )
 
+    @staticmethod
+    def _temporary_files_exist(state: MailProcessingState | dict[str, Any]) -> bool:
+        raw = state.get("raw_email_path")
+        return (
+            isinstance(raw, str)
+            and Path(raw).is_file()
+            and MessageGraph._paths_exist(state.get("attachment_payloads", []))
+        )
+
     def _can_reuse_output(self, stage: str, output: dict[str, Any], state: MailProcessingState) -> bool:
         # `fetch_message` carries only references to a TemporaryDirectory.  They are deliberately not a durable result.
         if stage == "fetch_message":
-            return self._paths_exist(output.get("attachment_payloads"))
+            return self._temporary_files_exist(output)
         if stage in _ATTACHMENT_BYTE_NODES and not state.get("attachments"):
             return False
         return True
@@ -339,7 +359,7 @@ class MessageGraph:
             elif stage == "summarize_message":
                 self.repository.stage(stable, "summarized")
             elif stage == "commit_processing_state":
-                self.repository.table_committed(
+                self.repository.result_committed(
                     stable, {"checkpoint_thread_id": stable, "node": "commit_processing_state"}
                 )
             elif stage == "complete":
@@ -359,8 +379,8 @@ class MessageGraph:
             ("process_attachments", self._process),
             ("validate_extractions", self._validate),
             ("summarize_message", self._summarize),
-            ("prepare_table_record", self._prepare),
-            ("update_yandex_disk_table", self._update_table),
+            ("prepare_api_record", self._prepare),
+            ("persist_result_via_api", self._persist),
             ("commit_processing_state", self._commit),
             ("mark_message_as_read", self._mark_read),
             ("complete", self._complete),
@@ -392,7 +412,7 @@ class MessageGraph:
                 {"next": destination, "manual_review": "manual_review", "failure": "failure"},
             )
         graph.add_conditional_edges(
-            "manual_review__checkpointed", route_error, {"next": "update_yandex_disk_table", "failure": "failure"}
+            "manual_review__checkpointed", route_error, {"next": "prepare_api_record", "failure": "failure"}
         )
         graph.add_edge("failure", END)
         return graph.compile(checkpointer=self._checkpointer)
@@ -416,7 +436,9 @@ class MessageGraph:
             "attachment_plans": [],
             "attachment_results": [],
             "summary": None,
-            "table_result": None,
+            "api_record": None,
+            "api_commit_result": None,
+            "raw_email_path": None,
             "attempts": {},
             "warnings": [],
             "errors": [],
@@ -471,31 +493,37 @@ class MessageGraph:
             and snapshot_generation == generation
         )
         predecessor = self._resume_predecessor(str(failed)) if failed else None
-        if same_run and snapshot.next:
+        if same_run and snapshot.next and not failed:
             # Незавершённый superstep уже определён публичным checkpoint API. В частности,
             # здесь завершается технический узел, который подтверждает journal после action patch.
             result = self.graph.invoke(None, config)
         elif same_run and predecessor is not None:
             resume_stage = str(failed)
-            if self._needs_attachment_bytes(resume_stage) and not self._paths_exist(
-                snapshot_values.get("attachment_payloads")
-            ):
+            # Любой незавершённый путь до `persist_result_via_api` требует raw MIME; checkpoint намеренно не хранит путь.
+            refetch_temporary_files = not self._temporary_files_exist(snapshot_values) and resume_stage not in {
+                "mark_message_as_read",
+                "complete",
+            }
+            if refetch_temporary_files:
                 resume_stage, predecessor = "fetch_message", "check_idempotency__checkpointed"
             self.repository.start(stable)
-            self.graph.update_state(
-                config,
-                {
-                    "run_id": initial["run_id"],
-                    "temporary_dir": initial["temporary_dir"],
-                    "attachment_payloads": [],
-                    "attachment_paths": {},
-                    "failed_stage": None,
-                    "status": "processing",
-                    "pending_node_name": None,
-                    "pending_execution_key": None,
-                },
-                as_node=predecessor,
-            )
+            patch: dict[str, Any] = {
+                "run_id": initial["run_id"],
+                "failed_stage": None,
+                "status": "processing",
+                "pending_node_name": None,
+                "pending_execution_key": None,
+            }
+            if refetch_temporary_files:
+                patch.update(
+                    {
+                        "temporary_dir": initial["temporary_dir"],
+                        "attachment_payloads": [],
+                        "attachment_paths": {},
+                        "raw_email_path": None,
+                    }
+                )
+            self.graph.update_state(config, patch, as_node=predecessor)
             result = self.graph.invoke(None, config)
         else:
             result = self.graph.invoke(initial, config)
@@ -524,8 +552,8 @@ class MessageGraph:
         item = self.repository.get(stable)
         if item and item["status"] == "completed":
             return {"record_id": stable, "status": "completed"}
-        if item and item["status"] == "table_committed":
-            return {"record_id": stable, "status": "table_committed"}
+        if item and item["status"] == "result_committed":
+            return {"record_id": stable, "status": "result_committed"}
         self.repository.start(stable)
         return {"record_id": stable, "status": "processing"}
 
@@ -549,8 +577,8 @@ class MessageGraph:
 
     def _store_attachment_payloads(
         self, message: dict[str, Any], temporary_dir: Path
-    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        """Оставляет bytes только во временной папке текущей попытки, не в state/checkpoint."""
+    ) -> tuple[dict[str, Any], list[dict[str, Any]], str]:
+        """Оставляет MIME и attachment bytes только во временной папке, не в state/checkpoint."""
 
         clean = self._safe_message_value(message)
         if not isinstance(clean, dict):  # pragma: no cover - MailGateway contract
@@ -558,6 +586,18 @@ class MessageGraph:
         raw_attachments = message.get("attachments", [])
         entries = raw_attachments if isinstance(raw_attachments, list) else []
         payload_dir = temporary_dir / "payloads"
+        raw_bytes = message.get("raw_bytes")
+        if not isinstance(raw_bytes, bytes):
+            raise PermanentError("Почтовый адаптер не вернул исходный MIME-файл.")
+        payload_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb", suffix=".eml", prefix="raw-", dir=payload_dir, delete=False
+            ) as raw:
+                raw.write(raw_bytes)
+            raw_path = raw.name
+        except OSError as exc:
+            raise ResultsAPIError("Не удалось безопасно сохранить временный MIME-файл.") from exc
         payloads: list[dict[str, Any]] = []
         descriptors: list[dict[str, Any]] = []
         for index, item in enumerate(entries):
@@ -571,24 +611,29 @@ class MessageGraph:
             if not isinstance(data, bytes):
                 payloads.append({"index": index, "path": None})
                 continue
-            payload_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-            path = payload_dir / f"{index:04d}.payload"
-            path.write_bytes(data)
-            payloads.append({"index": index, "path": str(path)})
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="wb", suffix=".payload", prefix=f"attachment-{index}-", dir=payload_dir, delete=False
+                ) as attachment:
+                    attachment.write(data)
+                payloads.append({"index": index, "path": attachment.name})
+            except OSError as exc:
+                raise ResultsAPIError("Не удалось безопасно сохранить временное вложение.") from exc
         clean["attachments"] = descriptors
-        return clean, payloads
+        return clean, payloads, raw_path
 
     def _fetch_message(self, state: MailProcessingState) -> dict[str, Any]:
         if state.get("status") == "completed":
             return {}
         raw_message = self.mail.fetch_message(state["uid"], state["mailbox"])
-        message, payloads = self._store_attachment_payloads(raw_message, Path(state["temporary_dir"]))
+        message, payloads, raw_path = self._store_attachment_payloads(raw_message, Path(state["temporary_dir"]))
         stable = state["record_id"]
         self.repository.message_fetched(stable, message)
         return {
             "message_id": message.get("message_id"),
             "message_metadata": message,
             "attachment_payloads": payloads,
+            "raw_email_path": raw_path,
         }
 
     def _normalize(self, state: MailProcessingState) -> dict[str, Any]:
@@ -631,16 +676,9 @@ class MessageGraph:
         attachment_dir = Path(state["temporary_dir"]) / "attachments"
         entries = state["message_metadata"].get("attachments", [])
         payloads = state.get("attachment_payloads", [])
+        if isinstance(entries, list) and len(entries) > self.analysis.settings.limits.max_attachments_per_message:
+            raise PermanentError("Количество вложений превышает настроенный лимит; частичное сохранение запрещено.")
         for index, item in enumerate(entries):
-            if index >= self.analysis.settings.limits.max_attachments_per_message:
-                warnings.append("Достигнут лимит количества вложений; остальные учтены без извлечения.")
-                for remaining_index, remaining in enumerate(entries[index:], index + 1):
-                    if not isinstance(remaining, dict):
-                        continue
-                    name = str(remaining.get("filename") or f"Вложение {remaining_index}").strip()[:160]
-                    if name and name not in unavailable_names:
-                        unavailable_names.append(name)
-                break
             if not isinstance(item, dict):
                 continue
             name = str(item.get("filename") or f"Вложение {index + 1}").strip()[:160] or f"Вложение {index + 1}"
@@ -1051,19 +1089,74 @@ class MessageGraph:
         return output
 
     def _prepare(self, state: MailProcessingState) -> dict[str, Any]:
-        return {"table_result": self._table_result(state, state["summary"] or {})}
+        return {"api_record": self._api_record(state, state["summary"] or {})}
 
-    @staticmethod
-    def _table_result(state: MailProcessingState, summary: dict[str, Any]) -> dict[str, Any]:
+    def _api_record(self, state: MailProcessingState, summary: dict[str, Any]) -> dict[str, Any]:
+        message = state.get("message_metadata", {})
+        metadata = message if isinstance(message, dict) else {}
+        received_value = metadata.get("date")
+        try:
+            received_at = (
+                datetime.fromisoformat(str(received_value)).astimezone(UTC) if received_value else datetime.now(UTC)
+            )
+        except ValueError:
+            received_at = datetime.now(UTC)
+        headers = metadata.get("headers", [])
+        ordered_headers = [
+            {"name": str(item[0]), "value": str(item[1])}
+            for item in headers
+            if isinstance(item, list | tuple) and len(item) == 2
+        ]
+        attachments = state.get("attachments", [])
+        file_entries: list[dict[str, Any]] = []
+        if isinstance(attachments, list):
+            for index, item in enumerate(attachments):
+                if not isinstance(item, dict):
+                    continue
+                file_entries.append(
+                    {
+                        "part_name": f"attachment_{index}",
+                        "original_filename": str(item.get("original_filename") or ""),
+                        "safe_filename": str(item.get("safe_filename") or f"attachment-{index}.bin"),
+                        "content_type": str(item.get("content_type") or "application/octet-stream"),
+                        "detected_content_type": str(item.get("detected_content_type") or "application/octet-stream"),
+                        "size": int(item.get("size") or 0),
+                        "sha256": str(item.get("sha256") or ""),
+                        "is_inline": bool(item.get("is_inline")),
+                        "content_id": item.get("content_id"),
+                    }
+                )
         return {
+            "schema_version": 1,
             "record_id": state["record_id"],
+            "pipeline_version": str(state.get("pipeline_version") or self.pipeline_version),
+            "processing_generation": int(state.get("processing_generation", 0)),
             "mailbox": state["mailbox"],
             "uid": state["uid"],
             "message_id": state.get("message_id"),
-            "message": state.get("message_metadata", {}),
-            "body": state.get("normalized_body", ""),
-            "attachments": state.get("attachment_results", []),
-            "summary": summary,
+            "received_at": received_at.isoformat(),
+            "processed_at": datetime.now(UTC).isoformat(),
+            "original_email": {
+                "subject": str(metadata.get("subject") or ""),
+                "from": str(metadata.get("from") or ""),
+                "to": list(metadata.get("to") or []),
+                "cc": list(metadata.get("cc") or []),
+                "bcc": list(metadata.get("bcc") or []),
+                "reply_to": list(metadata.get("reply_to") or []),
+                "headers": ordered_headers,
+                "flags": list(metadata.get("flags") or []),
+                "size_bytes": int(metadata.get("size_bytes") or 0),
+                "text_plain": str(metadata.get("text_plain") or ""),
+                "text_html": str(metadata.get("text_html") or ""),
+                "normalized_body": str(state.get("normalized_body") or ""),
+            },
+            "agent_result": {
+                "summary": summary,
+                "attachments": state.get("attachment_results", []),
+                "warnings": state.get("warnings", []),
+                "attachment_count": len(file_entries),
+            },
+            "files": file_entries,
         }
 
     def _manual_review(self, state: MailProcessingState) -> dict[str, Any]:
@@ -1116,18 +1209,29 @@ class MessageGraph:
         )
         return {
             "summary": summary,
-            "table_result": self._table_result(state, summary),
+            "api_record": self._api_record(state, summary),
             "failed_stage": None,
             "manual_review_stage": stage,
             "manual_review_error_type": error_type,
             "status": "processing",
         }
 
-    def _update_table(self, state: MailProcessingState) -> dict[str, Any]:
-        return {"table_result": self.workbook.upsert(state["table_result"] or {})}
+    def _persist(self, state: MailProcessingState) -> dict[str, Any]:
+        raw_path = state.get("raw_email_path")
+        if not isinstance(raw_path, str):
+            raise ResultsAPIError("Временный MIME-файл недоступен для отправки.")
+        payload = state.get("api_record")
+        if not isinstance(payload, dict):
+            raise PermanentError("Не подготовлен контракт Results API.")
+        confirmation = self.results_api.persist(
+            payload,
+            raw_email_path=Path(raw_path),
+            attachment_paths=self._hydrate_attachment_paths(state),
+        )
+        return {"api_commit_result": confirmation.model_dump(mode="json")}
 
     def _commit(self, state: MailProcessingState) -> dict[str, Any]:
-        return {"status": "table_committed"}
+        return {"status": "result_committed"}
 
     def _mark_read(self, state: MailProcessingState) -> dict[str, Any]:
         self.mail.mark_read(state["uid"], state["mailbox"])

@@ -54,7 +54,19 @@ class OCRSettings(_Model):
     fallback_to_vlm: bool = True
 
 
+class ResultsAPISettings(_Model):
+    """Несекретные настройки контрактного API; ключ передаётся только через окружение."""
+
+    base_url: str = "http://127.0.0.1:8080"
+    api_key: str = ""
+    timeout_seconds: PositiveInt = 300
+    max_retries: int = Field(default=3, ge=0, le=10)
+    verify_tls: bool = True
+
+
 class TableSettings(_Model):
+    """Устаревшая модель для изолированных legacy-утилит; AgentSettings её не использует."""
+
     remote_path: str = "/mail-agent/mail-register.xlsx"
     sheet_name: str = "Письма"
     header_row: PositiveInt = 1
@@ -71,7 +83,6 @@ class TableSettings(_Model):
             "summary": "Итоговая суммаризация",
             "attachment_summary": "Суммаризация вложений",
             "key_facts": "Ключевые факты и особенности",
-            # Нужен только для безопасного обновления строк; в Excel колонка скрыта.
             "record_id": "ID записи",
         }
     )
@@ -118,13 +129,12 @@ class AgentSettings(_Model):
     db_path: Path = Path("./var/mail-agent/state.sqlite3")
     checkpoint_db_path: Path = Path("./var/mail-agent/checkpoints.sqlite3")
     mail_env_file: Path = Path("./yandex/mail/.env")
-    drive_env_file: Path = Path("./yandex/drive/.env")
     log_level: str = "INFO"
-    pipeline_version: str = "1"
+    pipeline_version: str = "2"
     mail: MailSettings = Field(default_factory=MailSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     ocr: OCRSettings = Field(default_factory=OCRSettings)
-    table: TableSettings = Field(default_factory=TableSettings)
+    results_api: ResultsAPISettings = Field(default_factory=ResultsAPISettings)
     limits: LimitsSettings = Field(default_factory=LimitsSettings)
     retries: RetrySettings = Field(default_factory=RetrySettings)
     dashboard: DashboardSettings = Field(default_factory=DashboardSettings)
@@ -151,7 +161,6 @@ _ENV: dict[str, tuple[str, ...]] = {
     "AGENT_DB_PATH": ("db_path",),
     "AGENT_CHECKPOINT_DB_PATH": ("checkpoint_db_path",),
     "MAIL_ENV_FILE": ("mail_env_file",),
-    "DRIVE_ENV_FILE": ("drive_env_file",),
     "LOG_LEVEL": ("log_level",),
     "PIPELINE_VERSION": ("pipeline_version",),
     "MAILBOX": ("mail", "mailbox"),
@@ -173,8 +182,11 @@ _ENV: dict[str, tuple[str, ...]] = {
     "OCR_TIMEOUT_SECONDS": ("ocr", "timeout_seconds"),
     "OCR_MAX_RETRIES": ("ocr", "max_retries"),
     "OCR_FALLBACK_TO_VLM": ("ocr", "fallback_to_vlm"),
-    "TABLE_REMOTE_PATH": ("table", "remote_path"),
-    "TABLE_SHEET_NAME": ("table", "sheet_name"),
+    "RESULTS_API_BASE_URL": ("results_api", "base_url"),
+    "RESULTS_API_KEY": ("results_api", "api_key"),
+    "RESULTS_API_TIMEOUT_SECONDS": ("results_api", "timeout_seconds"),
+    "RESULTS_API_MAX_RETRIES": ("results_api", "max_retries"),
+    "RESULTS_API_VERIFY_TLS": ("results_api", "verify_tls"),
     "DASHBOARD_HOST": ("dashboard", "host"),
     "DASHBOARD_PORT": ("dashboard", "port"),
 }
@@ -205,6 +217,9 @@ def load_settings(config_file: str | Path | None = None, environ: Mapping[str, s
         if not isinstance(parsed, dict):
             raise ConfigurationError("Корень YAML-конфигурации должен быть объектом.")
         data = parsed
+    results_api_value = data.get("results_api")
+    if isinstance(results_api_value, dict) and results_api_value.get("api_key"):
+        raise ConfigurationError("results_api.api_key должен передаваться только через окружение.")
     for name, path in _ENV.items():
         if name in env and env[name] != "":
             _set_path(data, path, env[name])

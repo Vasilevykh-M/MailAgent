@@ -20,7 +20,7 @@ STATUSES = {
     "processing",
     "attachments_processed",
     "summarized",
-    "table_committed",
+    "result_committed",
     "completed",
     "retryable_error",
     "permanent_error",
@@ -61,7 +61,7 @@ class ProcessingRepository:
                   last_attempt_at TEXT, next_retry_at TEXT, failed_stage TEXT, error_type TEXT, error_message TEXT,
                   attachment_hashes TEXT NOT NULL DEFAULT '[]', cached_extraction_results TEXT NOT NULL DEFAULT '{}',
                   checkpoint TEXT, pipeline_version TEXT NOT NULL, processing_generation INTEGER NOT NULL DEFAULT 0,
-                  table_commit_status TEXT NOT NULL DEFAULT 'pending', current_stage TEXT, sender TEXT, subject TEXT,
+                  api_commit_status TEXT NOT NULL DEFAULT 'pending', current_stage TEXT, sender TEXT, subject TEXT,
                   message_date TEXT, requires_manual_review INTEGER NOT NULL DEFAULT 0, manual_review_stage TEXT,
                   manual_review_error_type TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, completed_at TEXT
                 );
@@ -109,9 +109,19 @@ class ProcessingRepository:
                 "manual_review_stage": "TEXT",
                 "manual_review_error_type": "TEXT",
                 "processing_generation": "INTEGER NOT NULL DEFAULT 0",
+                "api_commit_status": "TEXT NOT NULL DEFAULT 'pending'",
             }.items():
                 if name not in existing:
                     connection.execute(f"ALTER TABLE processing_records ADD COLUMN {name} {definition}")
+            # Старый `table_committed` доказывает лишь Excel-запись, а не commit Results API.
+            # Поэтому он безопасно возвращается в очередь и не может привести к установке `\\Seen`.
+            connection.execute(
+                """UPDATE processing_records
+                   SET status='discovered', api_commit_status='legacy_unmigrated', checkpoint=NULL, current_stage=NULL,
+                       updated_at=?
+                   WHERE status='table_committed'""",
+                (self._now(),),
+            )
             connection.execute(
                 "INSERT OR IGNORE INTO runtime_status(singleton, updated_at) VALUES (1, ?)", (self._now(),)
             )
@@ -155,7 +165,7 @@ class ProcessingRepository:
                     """UPDATE processing_records
                        SET pipeline_version=?, processing_generation=processing_generation+1, status='discovered',
                            next_retry_at=NULL, current_stage=NULL, failed_stage=NULL, error_type=NULL,
-                           error_message=NULL, checkpoint=NULL, table_commit_status='pending', completed_at=NULL,
+                           error_message=NULL, checkpoint=NULL, api_commit_status='pending', completed_at=NULL,
                            requires_manual_review=0, manual_review_stage=NULL, manual_review_error_type=NULL,
                            updated_at=? WHERE record_id=?""",
                     (pipeline_version, now, stable),
@@ -219,13 +229,24 @@ class ProcessingRepository:
                 ),
             )
 
-    def table_committed(self, stable: str, checkpoint: dict[str, Any]) -> None:
-        """Фиксирует подтверждённую Excel-операцию; полный state остаётся в LangGraph."""
+    def result_committed(self, stable: str, checkpoint: dict[str, Any]) -> None:
+        """Фиксирует подтверждённый Results API commit; полный state остаётся в LangGraph."""
 
         with self._connection() as connection:
             connection.execute(
                 """UPDATE processing_records
-                   SET status='table_committed', table_commit_status='verified', checkpoint=?, updated_at=? WHERE record_id=?""",
+                   SET status='result_committed', api_commit_status='committed', checkpoint=?, updated_at=? WHERE record_id=?""",
+                (self._json(checkpoint), self._now(), stable),
+            )
+
+    def table_committed(self, stable: str, checkpoint: dict[str, Any]) -> None:
+        """Совместимость со старым API: Excel commit не является результатом API и не завершает письмо."""
+
+        with self._connection() as connection:
+            connection.execute(
+                """UPDATE processing_records
+                   SET status='discovered', api_commit_status='legacy_unmigrated', checkpoint=?, updated_at=?
+                   WHERE record_id=?""",
                 (self._json(checkpoint), self._now(), stable),
             )
 
@@ -302,7 +323,7 @@ class ProcessingRepository:
                 """UPDATE processing_records
                    SET status='discovered', processing_generation=processing_generation+1, next_retry_at=NULL,
                        current_stage=NULL, failed_stage=NULL, error_type=NULL, error_message=NULL, checkpoint=NULL,
-                       table_commit_status='pending', completed_at=NULL, requires_manual_review=0,
+                       api_commit_status='pending', completed_at=NULL, requires_manual_review=0,
                        manual_review_stage=NULL, manual_review_error_type=NULL, updated_at=?
                    WHERE record_id=?""",
                 (now, stable),

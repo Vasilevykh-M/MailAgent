@@ -6,13 +6,13 @@ from mail_agent.exceptions import PermanentError
 from mail_agent.storage.processing_repository import record_id
 
 
-def test_record_id_is_stable_and_table_commit_recovers(repository) -> None:
+def test_record_id_is_stable_and_result_commit_recovers(repository) -> None:
     first = record_id("INBOX", "12", "<id>")
     assert first == record_id("INBOX", "12", "<id>")
     repository.ensure("INBOX", "12", "<id>", "1")
     repository.start(first)
-    repository.table_committed(first, {"remote_path": "/x.xlsx"})
-    assert repository.get(first)["status"] == "table_committed"
+    repository.result_committed(first, {"request_id": "test"})
+    assert repository.get(first)["status"] == "result_committed"
     repository.completed(first)
     assert repository.get(first)["status"] == "completed"
 
@@ -41,14 +41,14 @@ def test_manual_requeue_resets_a_permanent_error(repository) -> None:
 def test_manual_reprocess_resets_a_completed_record(repository) -> None:
     stable = repository.ensure("INBOX", "15", "<id>", "1")
     repository.start(stable)
-    repository.table_committed(stable, {"remote_path": "/x.xlsx"})
+    repository.result_committed(stable, {"request_id": "test"})
     repository.completed(stable)
 
     assert repository.requeue_completed(stable)
     item = repository.get(stable)
     assert item is not None
     assert item["status"] == "discovered"
-    assert item["table_commit_status"] == "pending"
+    assert item["api_commit_status"] == "pending"
     assert item["checkpoint"] is None
     assert item["completed_at"] is None
     assert repository.may_attempt(stable)

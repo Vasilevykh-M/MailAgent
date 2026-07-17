@@ -22,7 +22,6 @@ dependencies = [
   "xlrd>=2.0.1",
   "PyYAML>=6.0",
   "pymupdf>=1.24",
-  "yandex-drive-sdk",
   "yandex-mail-sdk",
 ]
 
@@ -34,7 +33,6 @@ mail-agent = "mail_agent.cli:main"
 
 [tool.uv.sources]
 yandex-mail-sdk = { path = "../yandex/mail", editable = true }
-yandex-drive-sdk = { path = "../yandex/drive", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mail_agent"]
