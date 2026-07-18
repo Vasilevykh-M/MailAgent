@@ -10,7 +10,7 @@
 
 ## Ключи и TLS
 
-Writer и reader keys различны. Ротируйте их через secret manager/reverse proxy: добавьте новый key, перезапустите API и worker, затем удалите прежний. В production размещайте API только за TLS-terminating reverse proxy, ограничивайте request body, закрывайте PostgreSQL/MinIO в private network и не доверяйте входящему `X-Forwarded-*` без настройки proxy.
+Writer и reader keys различны. Ротируйте их через secret manager/reverse proxy: добавьте новый key, перезапустите API и worker, затем удалите прежний. `ALLOW_ANONYMOUS_READER=true` отключает reader key только для read-only API, включая выдачу тел писем и вложений; используйте его только для теста в доверенной сети и ограничьте доступ firewall. Write API остаётся защищён writer key. В production размещайте API только за TLS-terminating reverse proxy, ограничивайте request body, закрывайте PostgreSQL/MinIO в private network и не доверяйте входящему `X-Forwarded-*` без настройки proxy.
 
 ## Orphan cleanup и обновление
 

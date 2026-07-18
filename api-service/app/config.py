@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     s3_secure: bool = False
     writer_api_key: SecretStr = SecretStr("")
     reader_api_key: SecretStr = SecretStr("")
+    allow_anonymous_reader: bool = False
     max_message_bytes: PositiveInt = 25 * 1024 * 1024
     max_attachment_bytes: PositiveInt = 25 * 1024 * 1024
     max_attachments_per_message: PositiveInt = 30

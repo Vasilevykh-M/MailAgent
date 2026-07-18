@@ -173,8 +173,8 @@ def payload_for(attachment: bytes = b"document") -> dict[str, object]:
     }
 
 
-def client() -> tuple[TestClient, MemoryRepository, MemoryStorage]:
-    settings = Settings(writer_api_key="writer", reader_api_key="reader")
+def client(*, allow_anonymous_reader: bool = False) -> tuple[TestClient, MemoryRepository, MemoryStorage]:
+    settings = Settings(writer_api_key="writer", reader_api_key="reader", allow_anonymous_reader=allow_anonymous_reader)
     repository, storage = MemoryRepository(), MemoryStorage()
     return TestClient(create_app(settings, repository=repository, storage=storage)), repository, storage
 
@@ -222,6 +222,15 @@ def test_invalid_mapping_and_safe_errors() -> None:
     assert response.status_code == 422
     assert response.json()["error"] == "invalid_payload"
     assert "original.pdf" not in response.text
+
+
+def test_anonymous_reader_does_not_allow_anonymous_writer() -> None:
+    test_client, _repository, _storage = client(allow_anonymous_reader=True)
+
+    reader_response = test_client.get("/api/v1/emails?limit=1")
+    assert reader_response.status_code == 200
+    writer_response = test_client.put(f"/api/v1/internal/emails/{RECORD_ID}", files=files(payload_for()))
+    assert writer_response.status_code == 401
 
 
 def test_reader_list_and_detail_stream_without_storage_url() -> None:

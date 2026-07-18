@@ -52,6 +52,20 @@ make infra-up
 make health-data
 ```
 
+Для тестирования read-only API с другого хоста в доверенной LAN без reader key
+измените в `.env` и перезапустите инфраструктуру:
+
+```bash
+RESULTS_API_HOST=0.0.0.0
+ALLOW_ANONYMOUS_READER=true
+make infra-up
+curl http://192.168.88.32:8080/api/v1/emails?limit=10
+```
+
+Режим открывает другим устройствам сети metadata, содержимое писем и вложения,
+поэтому не публикуйте TCP/8080 в интернет. Write API по-прежнему требует
+`WRITER_API_KEY`.
+
 OCR на CPU запускается на отдельной машине. Замена `paddlepaddle` на GPU-wheel не
 требуется и не должна выполняться. На хосте агента достаточно проверить его
 доступность:
@@ -105,7 +119,8 @@ uv run --project agent mail-agent worker
 ```
 
 Не подставляйте реальные секреты в repository-примеры и не открывайте `8001`,
-`8080`, PostgreSQL или MinIO во внешний интернет. TCP/8000 OCR разрешайте только
+`8080`, PostgreSQL или MinIO во внешний интернет. TCP/8080 без reader key
+допустим только в явно разрешённой доверенной LAN. TCP/8000 OCR разрешайте только
 между агентом и OCR-хостом. Для Docker Engine на Ubuntu 24.04, используемого
 инфраструктурными контейнерами, применяйте
 [официальную инструкцию Docker](https://docs.docker.com/engine/install/ubuntu/).

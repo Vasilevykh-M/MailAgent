@@ -18,7 +18,11 @@ curl -X PUT "http://127.0.0.1:8080/api/v1/internal/emails/$RECORD_ID" \
 
 ## Чтение
 
-Внешние endpoints используют `X-API-Key: READER_API_KEY` либо `Authorization: Bearer READER_API_KEY`.
+В обычном режиме external endpoints используют `X-API-Key: READER_API_KEY` либо
+`Authorization: Bearer READER_API_KEY`. При `ALLOW_ANONYMOUS_READER=true` все
+перечисленные read-only endpoints доступны без ключа. Это открывает содержимое
+писем и вложения каждому, кто может подключиться к API; включайте режим только в
+доверенной сети. Write endpoint всегда требует `WRITER_API_KEY`.
 
 - `GET /api/v1/emails?limit=50&cursor=...&from=...&to=...&mailbox=INBOX` — лёгкий список с opaque keyset cursor. Максимум `100`.
 - `GET /api/v1/emails/{record_id}` — metadata, ordered headers, bodies, полный processing result и API links.

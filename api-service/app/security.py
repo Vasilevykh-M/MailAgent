@@ -34,6 +34,8 @@ def require_reader(settings: Settings | None = None) -> Callable[[str | None], N
         x_api_key: str | None = Header(default=None, alias="X-API-Key"),
         authorization: str | None = Header(default=None),
     ) -> None:
+        if selected.allow_anonymous_reader:
+            return
         bearer = authorization[7:] if authorization and authorization.lower().startswith("bearer ") else None
         expected = selected.reader_api_key.get_secret_value()
         if not (_authenticated(x_api_key, expected) or _authenticated(bearer, expected)):
