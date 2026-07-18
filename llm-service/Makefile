@@ -50,7 +50,7 @@ PIPELINE_PARALLEL_SIZE ?= 1
 DISTRIBUTED_EXECUTOR_BACKEND ?= ray
 MAX_MODEL_LEN ?= 4096
 MAX_NUM_SEQS ?= 1
-GPU_MEMORY_UTILIZATION ?= 0.80
+GPU_MEMORY_UTILIZATION ?= 0.90
 CPU_OFFLOAD_GB ?= 14
 DTYPE ?= half
 KV_CACHE_DTYPE ?= auto
@@ -240,6 +240,7 @@ start: check-cli ray-start
 stop-api:
 	@if [[ ! -f "$(PID_FILE)" ]]; then echo 'vLLM PID file is absent.'; exit 0; fi; \
 	pid="$$(<"$(PID_FILE)")"; command="$$(ps -p "$$pid" -o command= 2>/dev/null || true)"; \
+	if ! kill -0 "$$pid" 2>/dev/null; then rm -f "$(PID_FILE)"; echo 'vLLM process is already stopped.'; exit 0; fi; \
 	if [[ "$$command" != *"$(VLLM)"* || "$$command" != *'serve'* ]]; then echo 'Refusing to stop an unverified PID.' >&2; exit 1; fi; \
 	kill -TERM "$$pid"; \
 	for _ in $$(seq 1 30); do kill -0 "$$pid" 2>/dev/null || break; sleep 1; done; \

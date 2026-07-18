@@ -10,9 +10,10 @@ HOST := 127.0.0.1
 BIND_HOST := 127.0.0.1
 PORT := 8001
 
-# Ray работает только на этом хосте.
-RAY_HEAD_IP := 127.0.0.1
-RAY_NODE_IP := 127.0.0.1
+# Ray требует фактический адрес хоста, а не loopback. При нескольких сетевых
+# интерфейсах задайте один private/VPN IP вручную в обеих строках.
+RAY_HEAD_IP := $(shell hostname -I 2>/dev/null | awk '{print $$1}')
+RAY_NODE_IP := $(RAY_HEAD_IP)
 RAY_PORT := 6379
 RAY_EXPECTED_NODES := 1
 RAY_EXPECTED_GPUS := 1
@@ -31,10 +32,10 @@ TENSOR_PARALLEL_SIZE := 1
 PIPELINE_PARALLEL_SIZE := 1
 DISTRIBUTED_EXECUTOR_BACKEND := ray
 
-# Консервативный старт для 8 ГиБ VRAM. Не увеличивайте без успешного smoke-теста.
+# Профиль для 8 ГиБ VRAM: 0.90 оставляет KV-cache после загрузки весов.
 MAX_MODEL_LEN := 4096
 MAX_NUM_SEQS := 1
-GPU_MEMORY_UTILIZATION := 0.80
+GPU_MEMORY_UTILIZATION := 0.90
 # Нужны минимум 32 ГиБ RAM: веса, не поместившиеся в VRAM, загружаются в RAM.
 CPU_OFFLOAD_GB := 14
 DTYPE := half

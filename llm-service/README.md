@@ -24,7 +24,7 @@ API намеренно привязан к `127.0.0.1:8001`. Он доступе
 DTYPE := half
 MAX_MODEL_LEN := 4096
 MAX_NUM_SEQS := 1
-GPU_MEMORY_UTILIZATION := 0.80
+GPU_MEMORY_UTILIZATION := 0.90
 CPU_OFFLOAD_GB := 14
 LANGUAGE_MODEL_ONLY := true
 ```
@@ -42,9 +42,11 @@ free -h
 ```
 
 Если свободной RAM меньше 24 ГиБ или `make start` завершается ошибкой памяти, не
-запускайте mail-agent: сначала освободите/увеличьте RAM. Для ошибки CUDA OOM
-уменьшите в `config.mk` `MAX_MODEL_LEN` до `2048`, затем
-`GPU_MEMORY_UTILIZATION` до `0.70`; не увеличивайте параллелизм.
+запускайте mail-agent: сначала освободите/увеличьте RAM. Ошибка `No available
+memory for the cache blocks` означает, что после загрузки весов не осталось места
+для KV-cache: на выделенной GPU установите `GPU_MEMORY_UTILIZATION := 0.90`.
+Для фактической CUDA OOM уменьшите в `config.mk` `MAX_MODEL_LEN` до `2048`, затем
+`GPU_MEMORY_UTILIZATION` до `0.85`; не увеличивайте параллелизм.
 
 ## Установка и настройка
 
@@ -64,7 +66,9 @@ make install
 ```
 
 `config.mk` — несекретный файл. Шаблон уже настроен для одного хоста и одной GPU
-`0`; IP-адреса Ray остаются loopback. Не меняйте `PIPELINE_PARALLEL_SIZE`,
+`0`; API остаётся на loopback, а для Ray автоматически выбирается первый адрес из
+`hostname -I`. Если на сервере несколько интерфейсов, укажите один private/VPN IP
+в `RAY_HEAD_IP` и `RAY_NODE_IP`. Не меняйте `PIPELINE_PARALLEL_SIZE`,
 `RAY_EXPECTED_NODES` или `RAY_EXPECTED_GPUS` для этого профиля.
 
 Репозиторий модели публичный, но при ограничениях Hugging Face можно передать
