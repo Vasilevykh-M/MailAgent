@@ -81,7 +81,10 @@ services:
       PARTITIONS_MONTHS_AHEAD: ${PARTITIONS_MONTHS_AHEAD:-3}
       LOG_LEVEL: ${API_LOG_LEVEL:-INFO}
     ports:
-      - "${RESULTS_API_HOST:-127.0.0.1}:${RESULTS_API_PORT:-8080}:8080"
+      - target: 8080
+        published: "${RESULTS_API_PORT:-8080}"
+        host_ip: "${RESULTS_API_HOST:-127.0.0.1}"
+        protocol: tcp
     networks: [data]
 
 networks:
