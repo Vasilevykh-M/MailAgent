@@ -62,6 +62,10 @@ limits:
   chunk_size: 4000
   # Верхняя граница запросов к LLM на одно очень большое вложение.
   max_attachment_summary_chunks: 24
+  # Обычное письмо длиннее этого значения суммаризируется по фрагментам.
+  message_body_chunk_size: 3000
+  # Верхняя граница запросов к LLM на очень длинное тело письма.
+  max_message_body_summary_chunks: 24
 
 retries:
   max_attempts: 5

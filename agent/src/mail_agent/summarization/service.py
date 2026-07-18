@@ -21,6 +21,8 @@ from .prompts import (
     CORRECTION_SYSTEM,
     FORWARDED_MESSAGE_CHUNK_SYSTEM,
     FORWARDED_MESSAGE_REDUCE_SYSTEM,
+    MESSAGE_BODY_CHUNK_SYSTEM,
+    MESSAGE_BODY_REDUCE_SYSTEM,
     MESSAGE_DIGEST_SYSTEM,
     ROUTING_SYSTEM,
     SPREADSHEET_CHUNK_SYSTEM,
@@ -310,6 +312,39 @@ class AnalysisService:
             "chunked_summary": self._digest_evidence(self._reduce_digests(metadata, digests, reduce_system)),
         }
 
+    def _select_message_body_chunks(self, body: str) -> tuple[list[tuple[int, int, str]], str | None]:
+        """Возвращает фрагменты тела и предупреждение при равномерной выборке."""
+
+        size = self.settings.limits.message_body_chunk_size
+        source = [body[offset : offset + size] for offset in range(0, len(body), size)]
+        total = len(source)
+        maximum = self.settings.limits.max_message_body_summary_chunks
+        if total <= maximum:
+            indices = list(range(total))
+            warning = None
+        elif maximum == 1:
+            indices = [0]
+            warning = f"Тело письма состоит из {total} фрагментов; для суммаризации выбран 1 фрагмент."
+        else:
+            indices = sorted({round(index * (total - 1) / (maximum - 1)) for index in range(maximum)})
+            warning = f"Тело письма состоит из {total} фрагментов; для суммаризации выбрано {len(indices)} из них."
+        return [(index + 1, total, source[index]) for index in indices], warning
+
+    def _chunked_message_body_summary(self, body: str) -> tuple[dict[str, Any], str | None]:
+        chunks, sampling_warning = self._select_message_body_chunks(body)
+        digests = [
+            self._digest(
+                MESSAGE_BODY_CHUNK_SYSTEM,
+                {"chunk_number": index, "chunk_count": total, "text": chunk},
+            )
+            for index, total, chunk in chunks
+        ]
+        metadata = {"kind": "message_body", "chunk_count": chunks[0][1]}
+        digest = self._reduce_digests(metadata, digests, MESSAGE_BODY_REDUCE_SYSTEM)
+        if sampling_warning and sampling_warning not in digest.warnings_ru:
+            digest.warnings_ru = [*digest.warnings_ru[:3], sampling_warning]
+        return self._digest_evidence(digest), sampling_warning
+
     @staticmethod
     def _forwarded_sections(body: str) -> list[str]:
         """Сохраняет границы уровней пересылки перед поэтапной суммаризацией."""
@@ -417,7 +452,7 @@ class AnalysisService:
             confidence=digest.confidence,
         )
 
-    def _generate_final_summary(self, evidence: dict[str, Any], body: str) -> FinalSummary:
+    def _generate_final_summary(self, evidence: dict[str, Any]) -> FinalSummary:
         """Повторяет итоговую генерацию и затем пробует более короткий контракт сводки."""
 
         serialized = json.dumps(evidence, ensure_ascii=False)
@@ -455,7 +490,7 @@ class AnalysisService:
             "subject": evidence.get("subject"),
             "sender": evidence.get("sender"),
             "date": evidence.get("date"),
-            "body": self._shorten(body, self.settings.llm.max_text_chars_per_request // 2),
+            "body": evidence.get("body"),
             "attachments": [
                 {
                     "filename": item.get("filename"),
@@ -466,6 +501,9 @@ class AnalysisService:
                 if isinstance(item, dict)
             ],
         }
+        body_digest = evidence.get("body_digest")
+        if isinstance(body_digest, dict):
+            message_evidence["body_digest"] = body_digest
         for attempt in range(self.settings.llm.final_summary_attempts):
             try:
                 digest = self.llm.structured(
@@ -511,21 +549,30 @@ class AnalysisService:
             else:
                 attachment_evidence.append(self._summary_attachment(item, attachment_budget))
         forwarded_chain = self._summarize_forwarded_chain(body) if message.get("is_forwarded") else None
+        body_digest: dict[str, Any] | None = None
+        body_sampling_warning: str | None = None
+        if forwarded_chain is None and len(body) > body_budget:
+            body_digest, body_sampling_warning = self._chunked_message_body_summary(body)
         evidence = {
             "subject": self._shorten(message.get("subject"), 600),
             "sender": self._shorten(message.get("from"), 300),
             "date": self._shorten(message.get("date"), 100),
-            "body": "" if forwarded_chain is not None else self._shorten(body, body_budget),
+            "body": "" if forwarded_chain is not None or body_digest is not None else self._shorten(body, body_budget),
             "attachment_count": len(attachments),
             "attachments": attachment_evidence,
-            "warnings": [self._shorten(item, 300) for item in warnings[:20]],
+            "warnings": [self._shorten(item, 300) for item in [*warnings, body_sampling_warning] if item][:20],
         }
         if forwarded_chain is not None:
             evidence["forwarded_chain"] = forwarded_chain
+        if body_digest is not None:
+            evidence["body_digest"] = body_digest
         # Тело письма и извлечённый текст вложений — исходные данные, их нельзя
         # подставлять в ячейку вместо сводки. До ручной проверки выполняются
         # повторные попытки с более компактным контрактом.
-        summary = self._generate_final_summary(evidence, body)
+        summary = self._generate_final_summary(evidence)
+        if body_sampling_warning and body_sampling_warning not in summary.warnings_ru:
+            summary = summary.model_copy(deep=True)
+            summary.warnings_ru.append(body_sampling_warning)
         return self._with_attachment_notices(summary, attachments)
 
     @staticmethod

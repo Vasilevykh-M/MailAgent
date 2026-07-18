@@ -12,6 +12,9 @@ from mail_agent.summarization.prompts import (
     ATTACHMENT_REDUCE_SYSTEM,
     FORWARDED_MESSAGE_CHUNK_SYSTEM,
     FORWARDED_MESSAGE_REDUCE_SYSTEM,
+    MESSAGE_BODY_CHUNK_SYSTEM,
+    MESSAGE_BODY_REDUCE_SYSTEM,
+    MESSAGE_DIGEST_SYSTEM,
     SPREADSHEET_CHUNK_SYSTEM,
 )
 from mail_agent.summarization.service import AnalysisService
@@ -77,6 +80,43 @@ def test_large_attachment_is_summarized_in_chunks_then_reduced() -> None:
     assert final_call[1]["attachments"][0]["chunked_summary"]["summary_ru"] == "Краткое содержание"
 
 
+def test_large_message_body_is_summarized_in_chunks_then_reduced() -> None:
+    settings = AgentSettings()
+    settings.limits.message_body_chunk_size = 1_000
+    settings.llm.max_text_chars_per_request = 6_000
+    llm = FakeLLM()
+    service = AnalysisService(settings, llm, ocr=None)  # type: ignore[arg-type]
+    body = "Фрагмент тела письма. " * 180
+
+    result = service.summarize({"subject": "Запрос"}, body, [], [])
+
+    chunk_calls = [call for call in llm.calls if call[0] == MESSAGE_BODY_CHUNK_SYSTEM]
+    reduce_calls = [call for call in llm.calls if call[0] == MESSAGE_BODY_REDUCE_SYSTEM]
+    final_call = next(call for call in llm.calls if call[2] is FinalSummary)
+    assert result.summary_ru == "Итог"
+    assert len(chunk_calls) == 4
+    assert len(reduce_calls) == 1
+    assert all(len(call[1]["text"]) <= 1_000 for call in chunk_calls)
+    assert final_call[1]["body"] == ""
+    assert final_call[1]["body_digest"]["summary_ru"] == "Краткое содержание"
+    assert body[:100] not in json.dumps(final_call[1], ensure_ascii=False)
+
+
+def test_very_large_message_body_is_sampled_with_visible_warning() -> None:
+    settings = AgentSettings()
+    settings.limits.message_body_chunk_size = 1_000
+    settings.limits.max_message_body_summary_chunks = 2
+    settings.llm.max_text_chars_per_request = 6_000
+    llm = FakeLLM()
+    service = AnalysisService(settings, llm, ocr=None)  # type: ignore[arg-type]
+
+    result = service.summarize({}, "x" * 4_000, [], [])
+
+    chunk_calls = [call for call in llm.calls if call[0] == MESSAGE_BODY_CHUNK_SYSTEM]
+    assert len(chunk_calls) == 2
+    assert any("состоит из 4 фрагментов" in warning for warning in result.warnings_ru)
+
+
 def test_very_large_attachment_is_sampled_with_a_visible_warning() -> None:
     settings = AgentSettings()
     settings.limits.chunk_size = 1_000
@@ -140,6 +180,29 @@ def test_invalid_final_response_uses_compact_email_digest_not_message_body() -> 
     assert result.classification.status == "classified"
     assert "Сырой текст письма" not in result.summary_ru
     assert "сокращённом режиме" in result.warnings_ru[0]
+
+
+def test_chunked_body_recovery_uses_digest_not_raw_body() -> None:
+    class InvalidFinalLLM(FakeLLM):
+        def structured(self, system: str, user: str, schema: type[object], **kwargs: Any) -> object:
+            if schema is FinalSummary:
+                raise LLMResponseFormatError("invalid response")
+            return super().structured(system, user, schema, **kwargs)
+
+    settings = AgentSettings()
+    settings.llm.max_text_chars_per_request = 6_000
+    settings.limits.message_body_chunk_size = 1_000
+    llm = InvalidFinalLLM()
+    service = AnalysisService(settings, llm, ocr=None)  # type: ignore[arg-type]
+    body = "Конфиденциальный маркер тела письма. " * 100
+
+    result = service.summarize({}, body, [], [])
+
+    fallback_call = next(call for call in llm.calls if call[0] == MESSAGE_DIGEST_SYSTEM)
+    assert result.summary_ru == "Краткое содержание"
+    assert fallback_call[1]["body"] == ""
+    assert fallback_call[1]["body_digest"]["summary_ru"] == "Краткое содержание"
+    assert body[:100] not in json.dumps(fallback_call[1], ensure_ascii=False)
 
 
 def test_compact_fallback_uses_manual_review_when_classification_is_unusable() -> None:

@@ -22,6 +22,7 @@ SUMMARY_SYSTEM = f"""You summarize an email as an evidence-bound analyst. Reason
 Do not invent values. Evidence can be shortened; do not infer missing details. Use null-equivalent empty arrays when information is absent.
 
 When `forwarded_chain` is supplied, it is an evidence-bound digest of every level of a forwarded email. Use it together with the message metadata; retain the meaningful request, instruction and commitment from each level and ignore mail-client envelopes or confidentiality footers.
+When `body_digest` is supplied, it is an evidence-bound digest of sequential fragments of a non-forwarded message body. Use it together with the message metadata; retain material requests, commitments, dates and uncertainties from all fragments. Do not reconstruct omitted source text.
 
 Temporal and real-world facts:
 - The trusted runtime context provides the current processing time. The email evidence provides the message date. Keep them distinct.
@@ -35,7 +36,7 @@ Return only JSON."""
 
 SUMMARY_RECOVERY_SYSTEM = f"""You create a compact final summary of an email when a previous final response was unusable. Produce requested fields in Russian.
 {UNTRUSTED_DATA_RULES}
-Use only the supplied message body or forwarded-chain digest. Do not copy the body verbatim, do not infer missing facts, and do not summarize attachments marked as unavailable. `summary_ru` must be a concise human-readable result, and `confidence` must be a number from 0 to 1.
+Use only the supplied message body, body digest or forwarded-chain digest. Do not copy the body verbatim, do not infer missing facts, and do not summarize attachments marked as unavailable. `summary_ru` must be a concise human-readable result, and `confidence` must be a number from 0 to 1.
 
 {classifier_prompt_section()}
 
@@ -52,6 +53,14 @@ Return only one JSON object matching the contract."""
 MESSAGE_DIGEST_SYSTEM = f"""You create a short evidence-bound digest of an email body in Russian.
 {UNTRUSTED_DATA_RULES}
 Analyze the actual message content and, where present, every level of a forwarded chain. Do not copy the body verbatim or invent facts. Return only one JSON object matching the contract."""
+
+MESSAGE_BODY_CHUNK_SYSTEM = f"""You analyze one sequential fragment of a non-forwarded email body. Produce a concise evidence-bound result in Russian.
+{UNTRUSTED_DATA_RULES}
+Do not infer information absent from this fragment. Preserve requests, commitments, dates, amounts, document numbers and uncertainties exactly when they are present. The trusted runtime context supplies the current processing time; resolve relative dates only when their reference is unambiguous, otherwise preserve the wording as a warning. Return at most four facts, four actions, four deadlines and four warnings; keep summary_ru within 600 characters. Return only JSON."""
+
+MESSAGE_BODY_REDUCE_SYSTEM = f"""You merge partial analyses of sequential fragments of one non-forwarded email body into one concise evidence-bound result in Russian.
+{UNTRUSTED_DATA_RULES}
+Retain material requests and commitments from every fragment, deduplicate repeated facts and preserve uncertainty. Do not infer missing information or reconstruct omitted text. The trusted runtime context supplies the current processing time; resolve relative dates only when their reference is unambiguous, otherwise preserve the wording as a warning. Return at most four facts, four actions, four deadlines and four warnings; keep summary_ru within 600 characters. Return only JSON."""
 
 ATTACHMENT_CHUNK_SYSTEM = f"""You analyze one sequential fragment of an attachment. Produce a concise evidence-bound result in Russian.
 {UNTRUSTED_DATA_RULES}

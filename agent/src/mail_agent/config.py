@@ -100,6 +100,8 @@ class LimitsSettings(_Model):
     max_parallel_attachments: PositiveInt = 1
     chunk_size: PositiveInt = 4_000
     max_attachment_summary_chunks: PositiveInt = 24
+    message_body_chunk_size: PositiveInt = 3_000
+    max_message_body_summary_chunks: PositiveInt = 24
 
 
 class RetrySettings(_Model):
@@ -185,6 +187,8 @@ _ENV: dict[str, tuple[str, ...]] = {
     "LLM_MAX_COMPLETION_TOKENS": ("llm", "max_completion_tokens"),
     "LLM_MAX_OCR_CORRECTION_TOKENS": ("llm", "max_ocr_correction_tokens"),
     "LLM_MAX_IMAGE_BYTES_PER_REQUEST": ("llm", "max_image_bytes_per_request"),
+    "MESSAGE_BODY_CHUNK_SIZE": ("limits", "message_body_chunk_size"),
+    "MAX_MESSAGE_BODY_SUMMARY_CHUNKS": ("limits", "max_message_body_summary_chunks"),
     "OCR_BASE_URL": ("ocr", "base_url"),
     "OCR_TIMEOUT_SECONDS": ("ocr", "timeout_seconds"),
     "OCR_MAX_RETRIES": ("ocr", "max_retries"),

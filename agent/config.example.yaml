@@ -32,6 +32,21 @@ results_api:
   timeout_seconds: 300
   max_retries: 3
   verify_tls: true
+limits:
+  max_attachment_size: 26214400
+  max_attachments_per_message: 30
+  max_pdf_pages: 50
+  max_pptx_slides: 100
+  max_xlsx_sheets: 20
+  max_xlsx_rows: 10000
+  max_xlsx_columns: 100
+  max_parallel_attachments: 1
+  # Размер фрагмента вложения для поэтапной суммаризации.
+  chunk_size: 4000
+  max_attachment_summary_chunks: 24
+  # Обычное тело письма длиннее этого значения суммаризируется по фрагментам.
+  message_body_chunk_size: 3000
+  max_message_body_summary_chunks: 24
 dashboard:
   # Для trusted LAN можно указать private/VPN IP сервера, например 192.168.88.32.
   # Публичные адреса и 0.0.0.0 запрещены.
