@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 from ipaddress import ip_address
 from pathlib import Path
@@ -202,6 +203,45 @@ _ENV: dict[str, tuple[str, ...]] = {
     "DASHBOARD_PORT": ("dashboard", "port"),
 }
 
+_ENVIRONMENT_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _read_environment_file(path: Path) -> dict[str, str]:
+    """Читает простой dotenv-файл без shell-подстановок и выполнения кода."""
+
+    if not path.exists():
+        return {}
+    try:
+        content = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ConfigurationError("Не удалось прочитать файл окружения агента.") from exc
+
+    values: dict[str, str] = {}
+    for line_number, raw_line in enumerate(content.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.partition("=")
+        key = key.strip()
+        if not separator or not _ENVIRONMENT_NAME.fullmatch(key):
+            raise ConfigurationError(f"Некорректная строка {line_number} в файле окружения агента.")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        values[key] = value
+    return values
+
+
+def _results_api_base_url(environment: Mapping[str, str]) -> str:
+    """Строит URL Results API из тех же host/port, что использует Compose."""
+
+    host = environment.get("RESULTS_API_HOST", "").strip()
+    if not host:
+        return ""
+    port = environment.get("RESULTS_API_PORT", "8080").strip() or "8080"
+    rendered_host = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    return f"http://{rendered_host}:{port}"
+
 
 def _set_path(target: dict[str, Any], path: tuple[str, ...], value: str) -> None:
     cursor = target
@@ -215,10 +255,23 @@ def _set_path(target: dict[str, Any], path: tuple[str, ...], value: str) -> None
 
 
 def load_settings(config_file: str | Path | None = None, environ: Mapping[str, str] | None = None) -> AgentSettings:
-    """Загружает YAML, затем накладывает переменные процесса без исполнения `.env`."""
+    """Загружает YAML, корневой `.env` и затем переменные процесса.
 
-    env = os.environ if environ is None else environ
-    config_path = Path(config_file or env.get("AGENT_CONFIG", "./agent/config.yaml"))
+    Файл `.env` читается как данные, без выполнения shell-кода. Он единый для
+    Docker Compose и worker: `WRITER_API_KEY` становится ключом Results API.
+    """
+
+    process_env = os.environ if environ is None else environ
+    config_path = Path(config_file or process_env.get("AGENT_CONFIG", "./agent/config.yaml"))
+    environment_file = Path(process_env.get("AGENT_ENV_FILE", ".env"))
+    env = _read_environment_file(environment_file)
+    env.update(process_env)
+    if not env.get("RESULTS_API_KEY") and env.get("WRITER_API_KEY"):
+        env["RESULTS_API_KEY"] = env["WRITER_API_KEY"]
+    if not process_env.get("RESULTS_API_BASE_URL"):
+        results_api_base_url = _results_api_base_url(env)
+        if results_api_base_url:
+            env["RESULTS_API_BASE_URL"] = results_api_base_url
     data: dict[str, Any] = {}
     if config_path.exists():
         try:

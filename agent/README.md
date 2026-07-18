@@ -50,11 +50,18 @@ unread pages → fetch(mark_read=False) → MIME во временный .eml
 
 ```bash
 cp agent/config.example.yaml agent/config.yaml
-cp agent/.env.example .env
+cp .env.infrastructure.example .env
 cp yandex/mail/.env.example yandex/mail/.env
 ```
 
-В `config.yaml` задаётся `results_api.base_url`, timeout/retry/TLS. `RESULTS_API_KEY` передаётся только окружением. Пример:
+Корневой `.env` — единый файл для Docker Compose и worker. Worker безопасно
+читает его как данные, без выполнения shell-кода: `WRITER_API_KEY` используется
+для записи в Results API, а `RESULTS_API_HOST` и `RESULTS_API_PORT` определяют
+его адрес. Не нужно отдельно экспортировать `RESULTS_API_KEY` или URL API.
+Явно переданные переменные окружения имеют приоритет; альтернативный файл можно
+указать через `AGENT_ENV_FILE`.
+
+В `config.yaml` задаются резервные значения, timeout/retry/TLS. Пример:
 
 ```yaml
 results_api:
@@ -69,7 +76,6 @@ results_api:
 
 ```bash
 make infra-up
-export RESULTS_API_KEY='writer key from local secret store'
 make install PROFILE=core
 make auth-mail
 make health PROFILE=core

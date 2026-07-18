@@ -24,8 +24,9 @@ curl -X PUT "http://127.0.0.1:8080/api/v1/internal/emails/$RECORD_ID" \
 писем и вложения каждому, кто может подключиться к API; включайте режим только в
 доверенной сети. Write endpoint всегда требует `WRITER_API_KEY`.
 
-- `GET /api/v1/emails?limit=50&cursor=...&from=...&to=...&mailbox=INBOX` — лёгкий список с opaque keyset cursor. Максимум `100`.
-- `GET /api/v1/emails/{record_id}` — metadata, ordered headers, bodies, полный processing result и API links.
+- `GET /api/v1/emails?limit=50&cursor=...&from=...&to=...&mailbox=INBOX` — лёгкий список с opaque keyset cursor. Каждый элемент содержит `id` (он же `record_id`), `subject`, `from`, `received_at`, preview, количество вложений и confidence. Максимум `100`.
+- `GET /api/v1/emails/{record_id}` — полная карточка письма. Верхнеуровневые поля `id`, `subject`, `from`, `received_at`, `content`, `summary`, `classification`, `key_facts`, `attachment_summaries` и `warnings` предназначены для интерфейса. `content` — нормализованный plain-text тела письма; исходные текстовая и HTML-версии остаются в `original_email`.
+- В `attachments` каждый файл содержит `id`, `filename`, `summary`, `key_facts` и `download_url`. `download_url` ведёт на потоковую загрузку файла через API; MinIO URL не выдаётся.
 - `GET /api/v1/emails/{record_id}/attachments/{attachment_id}/content` — поток файла.
 - `GET /api/v1/emails/{record_id}/raw` — поток original MIME как `message/rfc822`.
 - `GET /health/live`, `GET /health/ready` — readiness проверяет PostgreSQL и MinIO без чтения почтовых данных.

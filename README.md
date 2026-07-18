@@ -22,13 +22,16 @@ make health-data
 
 cp agent/config.example.yaml agent/config.yaml
 cp yandex/mail/.env.example yandex/mail/.env
-export RESULTS_API_KEY="$WRITER_API_KEY"
 make install PROFILE=core
 make auth-mail
 make once
 ```
 
-`agent/.env.example` содержит names переменных worker; перед запуском экспортируйте нужные значения в окружение. Не используйте один файл `.env` одновременно для Compose и worker без явной загрузки окружения.
+Один корневой `.env` используют и Docker Compose, и worker. Worker читает его
+без выполнения shell-кода: автоматически применяет `WRITER_API_KEY` для записи
+в Results API и строит его URL из `RESULTS_API_HOST` и `RESULTS_API_PORT`.
+Повторно экспортировать параметры перед `make worker`, `make process` или
+`make retry-failed` не нужно.
 
 ## Ubuntu 24.04: агент и отдельный LLM-хост с RTX 5090
 
@@ -99,20 +102,14 @@ make smoke
 
 После успешного `make health` на LLM-хосте подготовьте агент и запустите его на
 хосте агента.
-Значение `RESULTS_API_KEY` должно совпадать с `WRITER_API_KEY` из инфраструктурного
-файла; не записывайте его в `agent/config.yaml`.
+Worker получает ключ записи из `WRITER_API_KEY` и адрес Results API из
+`RESULTS_API_HOST`/`RESULTS_API_PORT` корневого `.env`; не записывайте ключ в
+`agent/config.yaml` и не экспортируйте эти значения вручную.
 
 ```bash
 cd ..
 cp agent/config.example.yaml agent/config.yaml
 cp yandex/mail/.env.example yandex/mail/.env
-export LLM_BASE_URL=http://192.168.88.251:8001/v1
-export LLM_API_KEY='set-from-secret-store-if-required'
-export LLM_MODEL=qwen3.5-9b
-export OCR_BASE_URL=http://192.14.88.2:8000
-export RESULTS_API_BASE_URL=http://127.0.0.1:8080
-export RESULTS_API_KEY='set-to-WRITER_API_KEY'
-export OCR_FALLBACK_TO_VLM=false
 uv sync --project agent --extra dev --python 3.11
 uv run --project agent mail-agent doctor
 uv run --project agent yandex-mail --env yandex/mail/.env auth

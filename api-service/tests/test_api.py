@@ -138,6 +138,7 @@ class MemoryRepository:
 
 
 def payload_for(attachment: bytes = b"document") -> dict[str, object]:
+    attachment_sha256 = hashlib.sha256(attachment).hexdigest()
     return {
         "schema_version": 1,
         "record_id": RECORD_ID,
@@ -157,7 +158,24 @@ def payload_for(attachment: bytes = b"document") -> dict[str, object]:
             "text_html": "<p>text</p>",
             "normalized_body": "text",
         },
-        "agent_result": {"summary": {"summary_ru": "Итог", "confidence": 0.9}, "attachments": []},
+        "agent_result": {
+            "summary": {
+                "summary_ru": "Итог",
+                "classification": {"class_code": "MACHINES", "class_name_ru": "Станки"},
+                "key_facts_ru": ["Срок поставки до 25 июля"],
+                "attachment_summaries": ["original.pdf: коммерческое предложение"],
+                "warnings_ru": ["Проверить срок поставки"],
+                "confidence": 0.9,
+            },
+            "attachments": [
+                {
+                    "sha256": attachment_sha256,
+                    "summary_ru": "Коммерческое предложение на станок",
+                    "key_facts_ru": ["Указан срок поставки"],
+                }
+            ],
+            "warnings": ["Вложение обработано автоматически"],
+        },
         "files": [
             {
                 "part_name": "attachment_0",
@@ -166,7 +184,7 @@ def payload_for(attachment: bytes = b"document") -> dict[str, object]:
                 "content_type": "application/pdf",
                 "detected_content_type": "application/pdf",
                 "size": len(attachment),
-                "sha256": hashlib.sha256(attachment).hexdigest(),
+                "sha256": attachment_sha256,
                 "is_inline": False,
             }
         ],
@@ -237,7 +255,9 @@ def test_reader_list_and_detail_stream_without_storage_url() -> None:
     test_client, _repository, _storage = client()
     list_response = test_client.get("/api/v1/emails?limit=1", headers={"Authorization": "Bearer reader"})
     assert list_response.status_code == 200
-    assert len(list_response.json()["items"]) == 1
+    list_item = list_response.json()["items"][0]
+    assert list_item["id"] == list_item["record_id"]
+    assert list_item["subject"] == "Тема"
     assert list_response.json()["has_more"]
     payload = payload_for()
     assert (
@@ -250,6 +270,18 @@ def test_reader_list_and_detail_stream_without_storage_url() -> None:
     assert detail.status_code == 200
     data = detail.json()
     assert "minio" not in detail.text.lower()
+    assert data["id"] == RECORD_ID
+    assert data["subject"] == "Тема"
+    assert data["from"] == "sender@example.test"
+    assert data["content"] == "text"
+    assert data["summary"] == "Итог"
+    assert data["classification"]["class_code"] == "MACHINES"
+    assert data["key_facts"] == ["Срок поставки до 25 июля"]
+    assert data["attachment_summaries"] == ["original.pdf: коммерческое предложение"]
+    assert data["attachments"][0]["id"] == data["attachments"][0]["attachment_id"]
+    assert data["attachments"][0]["filename"] == "original.pdf"
+    assert data["attachments"][0]["summary"] == "Коммерческое предложение на станок"
+    assert data["attachments"][0]["key_facts"] == ["Указан срок поставки"]
     assert data["original_email"]["headers"] == [
         {"name": "X-Repeat", "value": "one"},
         {"name": "X-Repeat", "value": "two"},

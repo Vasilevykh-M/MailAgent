@@ -40,19 +40,38 @@ def _request_id(request: Request) -> str:
     return str(getattr(request.state, "request_id", ""))
 
 
+def _text(value: object) -> str:
+    return value if isinstance(value, str) else ""
+
+
+def _strings(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def _mapping(value: object) -> dict[str, Any]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
 def _attachment_response(record_id: str, value: Attachment) -> AttachmentResponse:
+    processing_result = _mapping(value.processing_result)
     return AttachmentResponse(
         attachment_id=str(value.attachment_id),
+        id=str(value.attachment_id),
         position=value.position,
         original_filename=value.original_filename,
         safe_filename=value.safe_filename,
+        filename=value.original_filename or value.safe_filename,
         content_type=value.content_type,
         detected_content_type=value.detected_content_type,
         size=value.size,
         sha256=value.sha256,
         is_inline=value.is_inline,
         content_id=value.content_id,
-        processing_result=value.processing_result,
+        summary=_text(processing_result.get("summary_ru")) or None,
+        key_facts=_strings(processing_result.get("key_facts_ru")),
+        processing_result=processing_result or None,
         download_url=f"/api/v1/emails/{record_id}/attachments/{value.attachment_id}/content",
     )
 
@@ -225,7 +244,19 @@ def create_app(
     @app.get("/api/v1/emails/{record_id}", response_model=EmailDetail)
     async def get_email(record_id: str, _: None = Depends(require_reader(selected))) -> EmailDetail:
         email, attachments = await result_repository.detail(record_id)
+        original_email = OriginalEmail.model_validate(email.original_email)
+        agent_result = _mapping(email.agent_result)
+        summary = _mapping(agent_result.get("summary"))
         return EmailDetail(
+            id=email.record_id,
+            subject=original_email.subject,
+            **{"from": original_email.sender},
+            content=original_email.normalized_body or original_email.text_plain,
+            summary=_text(summary.get("summary_ru")),
+            classification=_mapping(summary.get("classification")) or None,
+            key_facts=_strings(summary.get("key_facts_ru")),
+            attachment_summaries=_strings(summary.get("attachment_summaries")),
+            warnings=[*_strings(summary.get("warnings_ru")), *_strings(agent_result.get("warnings"))],
             record_id=email.record_id,
             received_at=email.received_at,
             processed_at=email.processed_at,
@@ -234,8 +265,8 @@ def create_app(
             message_id=email.message_id,
             pipeline_version=email.pipeline_version,
             processing_generation=email.processing_generation,
-            original_email=OriginalEmail.model_validate(email.original_email),
-            agent_result=email.agent_result,
+            original_email=original_email,
+            agent_result=agent_result,
             attachments=[_attachment_response(record_id, item) for item in attachments],
             raw_download_url=f"/api/v1/emails/{record_id}/raw",
         )

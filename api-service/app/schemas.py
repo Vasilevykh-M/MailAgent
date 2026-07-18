@@ -103,12 +103,20 @@ class IngestionResponse(APIModel):
 
 class EmailListItem(APIModel):
     record_id: str
+    id: str = ""
     received_at: datetime
     sender: str = Field(alias="from")
     subject: str
     summary_preview: str
     attachment_count: int
     confidence: float | None = None
+
+    @model_validator(mode="after")
+    def public_id_matches_record_id(self) -> EmailListItem:
+        if self.id and self.id != self.record_id:
+            raise ValueError("id must match record_id")
+        self.id = self.record_id
+        return self
 
 
 class EmailListResponse(APIModel):
@@ -119,20 +127,33 @@ class EmailListResponse(APIModel):
 
 class AttachmentResponse(APIModel):
     attachment_id: str
+    id: str
     position: int
     original_filename: str
     safe_filename: str
+    filename: str
     content_type: str
     detected_content_type: str
     size: int
     sha256: str
     is_inline: bool
     content_id: str | None
+    summary: str | None
+    key_facts: list[str]
     processing_result: dict[str, Any] | None
     download_url: str
 
 
 class EmailDetail(APIModel):
+    id: str
+    subject: str
+    sender: str = Field(alias="from")
+    content: str
+    summary: str
+    classification: dict[str, Any] | None
+    key_facts: list[str]
+    attachment_summaries: list[str]
+    warnings: list[str]
     record_id: str
     received_at: datetime
     processed_at: datetime

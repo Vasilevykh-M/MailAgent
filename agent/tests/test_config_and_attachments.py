@@ -20,6 +20,42 @@ def test_environment_has_precedence_over_yaml(tmp_path: Path) -> None:
     assert settings.mail.batch_size == 7
 
 
+def test_shared_dotenv_supplies_writer_key_and_results_api_address(tmp_path: Path) -> None:
+    config = tmp_path / "config.yaml"
+    config.write_text("results_api:\n  base_url: http://127.0.0.1:8080\n", encoding="utf-8")
+    environment_file = tmp_path / ".env"
+    environment_file.write_text(
+        "WRITER_API_KEY='writer-secret'\nRESULTS_API_BASE_URL=http://127.0.0.1:8080\n"
+        "RESULTS_API_HOST=192.168.88.32\nRESULTS_API_PORT=8080\n",
+        encoding="utf-8",
+    )
+
+    settings = load_settings(config, {"AGENT_ENV_FILE": str(environment_file)})
+
+    assert settings.results_api.api_key == "writer-secret"
+    assert settings.results_api.base_url == "http://192.168.88.32:8080"
+
+
+def test_process_environment_overrides_shared_dotenv(tmp_path: Path) -> None:
+    environment_file = tmp_path / ".env"
+    environment_file.write_text(
+        "WRITER_API_KEY=writer-secret\nRESULTS_API_HOST=192.168.88.32\n",
+        encoding="utf-8",
+    )
+
+    settings = load_settings(
+        tmp_path / "missing.yaml",
+        {
+            "AGENT_ENV_FILE": str(environment_file),
+            "RESULTS_API_KEY": "override-secret",
+            "RESULTS_API_BASE_URL": "http://192.168.88.99:8080",
+        },
+    )
+
+    assert settings.results_api.api_key == "override-secret"
+    assert settings.results_api.base_url == "http://192.168.88.99:8080"
+
+
 def test_sanitize_html_removes_active_and_hidden_content() -> None:
     text = sanitize_html("<style>x</style><script>alert(1)</script><p>visible</p><p style='display:none'>hidden</p>")
     assert text == "visible"
