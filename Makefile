@@ -80,7 +80,7 @@ infra-status:
 	@docker compose ps
 
 api-migrate:
-	@docker compose run --rm api-service uv run alembic upgrade head
+	@docker compose run --rm api-service .venv/bin/alembic upgrade head
 
 api-test:
 	@cd "$(API_DIR)" && UV_CACHE_DIR="$(UV_CACHE_DIR)" uv run --extra dev pytest
@@ -93,4 +93,4 @@ api-typecheck:
 	@cd "$(API_DIR)" && UV_CACHE_DIR="$(UV_CACHE_DIR)" uv run --extra dev mypy app
 
 health-data:
-	@docker compose exec api-service uv run python -c "import httpx; response=httpx.get('http://127.0.0.1:8080/health/ready', timeout=5); response.raise_for_status(); print(response.json()['status'])"
+	@docker compose exec api-service .venv/bin/python -c "import httpx; response=httpx.get('http://127.0.0.1:8080/health/ready', timeout=5); response.raise_for_status(); print(response.json()['status'])"

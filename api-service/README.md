@@ -18,7 +18,7 @@ make health-data
 
 ```bash
 make api-migrate
-docker compose exec api-service uv run mail-results-partitions
+docker compose exec api-service .venv/bin/mail-results-partitions
 ```
 
 Для локальной разработки без Docker:

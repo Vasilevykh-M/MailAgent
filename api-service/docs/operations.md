@@ -17,7 +17,7 @@ Writer и reader keys различны. Ротируйте их через secre
 После сбоя PostgreSQL uploaded S3 objects остаются закрытыми. Удаляйте только старые, не связанные с locator prefixes:
 
 ```bash
-docker compose exec api-service uv run mail-results-orphans --older-than-hours 72
+docker compose exec api-service .venv/bin/mail-results-orphans --older-than-hours 72
 ```
 
 Перед обновлением сделайте backup volumes, примените новую миграцию отдельной командой, затем rolling restart `api-service`. Persistent volumes `postgres-data` и `minio-data` не удаляются командой `make infra-down`.
