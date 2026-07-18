@@ -32,6 +32,7 @@ from ..models import (
     MessageReference,
 )
 from ..storage.processing_repository import ProcessingRepository, record_id
+from ..summarization.classification import manual_review_classification
 from ..summarization.prompts import UNTRUSTED_DATA_RULES
 from ..summarization.service import AnalysisService
 from .routing import route_after_check, route_after_fetch, route_error
@@ -1185,6 +1186,7 @@ class MessageGraph:
                 attachment_summaries.append(notice)
         summary = FinalSummary(
             summary_ru="Автоматическая обработка не завершена. Письмо требует ручной проверки.",
+            classification=manual_review_classification(),
             attachment_summaries=attachment_summaries,
             warnings_ru=[
                 "Часть содержимого письма или вложений могла не попасть в итог.",

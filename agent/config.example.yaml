@@ -2,6 +2,7 @@ work_dir: ./var/mail-agent
 db_path: ./var/mail-agent/state.sqlite3
 checkpoint_db_path: ./var/mail-agent/checkpoints.sqlite3
 mail_env_file: ./yandex/mail/.env
+pipeline_version: "3"
 mail:
   mailbox: INBOX
   poll_interval_seconds: 60

@@ -130,7 +130,7 @@ class AgentSettings(_Model):
     checkpoint_db_path: Path = Path("./var/mail-agent/checkpoints.sqlite3")
     mail_env_file: Path = Path("./yandex/mail/.env")
     log_level: str = "INFO"
-    pipeline_version: str = "2"
+    pipeline_version: str = "3"
     mail: MailSettings = Field(default_factory=MailSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     ocr: OCRSettings = Field(default_factory=OCRSettings)

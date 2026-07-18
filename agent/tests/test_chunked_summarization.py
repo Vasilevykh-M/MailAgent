@@ -6,6 +6,7 @@ from typing import Any
 from mail_agent.config import AgentSettings
 from mail_agent.exceptions import LLMResponseFormatError
 from mail_agent.models import AttachmentDigest, FinalSummary, OCRCorrection
+from mail_agent.summarization.classification import EmailClassification
 from mail_agent.summarization.prompts import (
     ATTACHMENT_CHUNK_SYSTEM,
     ATTACHMENT_REDUCE_SYSTEM,
@@ -14,6 +15,17 @@ from mail_agent.summarization.prompts import (
     SPREADSHEET_CHUNK_SYSTEM,
 )
 from mail_agent.summarization.service import AnalysisService
+
+
+def _classification() -> EmailClassification:
+    return EmailClassification(
+        status="classified",
+        class_code="3D_PRINTERS",
+        class_name_ru="3D-принтеры",
+        reason_ru="Запрос относится к поставке промышленного 3D-принтера.",
+        confidence=0.9,
+        message_ru="Класс письма: 3D_PRINTERS — 3D-принтеры",
+    )
 
 
 class FakeLLM:
@@ -25,7 +37,9 @@ class FakeLLM:
         if schema is AttachmentDigest:
             return AttachmentDigest(summary_ru="Краткое содержание", key_facts_ru=["Факт"], confidence=0.9)
         if schema is FinalSummary:
-            return FinalSummary(summary_ru="Итог", confidence=0.9)
+            return FinalSummary(summary_ru="Итог", classification=_classification(), confidence=0.9)
+        if schema is EmailClassification:
+            return _classification()
         raise AssertionError(f"Неожиданная схема: {schema}")
 
 
@@ -123,8 +137,24 @@ def test_invalid_final_response_uses_compact_email_digest_not_message_body() -> 
 
     assert llm.final_attempts == service.settings.llm.final_summary_attempts
     assert result.summary_ru == "Краткое содержание"
+    assert result.classification.status == "classified"
     assert "Сырой текст письма" not in result.summary_ru
     assert "сокращённом режиме" in result.warnings_ru[0]
+
+
+def test_compact_fallback_uses_manual_review_when_classification_is_unusable() -> None:
+    class UnusableClassifierLLM(FakeLLM):
+        def structured(self, system: str, user: str, schema: type[object], **kwargs: Any) -> object:
+            if schema in {FinalSummary, EmailClassification}:
+                raise LLMResponseFormatError("invalid response")
+            return super().structured(system, user, schema, **kwargs)
+
+    service = AnalysisService(AgentSettings(), UnusableClassifierLLM(), ocr=None)  # type: ignore[arg-type]
+
+    result = service.summarize({}, "Содержимое письма для суммаризации.", [], [])
+
+    assert result.summary_ru == "Краткое содержание"
+    assert result.classification.status == "manual_review"
 
 
 def test_final_summary_retries_before_using_recovery_mode() -> None:

@@ -9,6 +9,18 @@ from mail_agent.exceptions import ExternalServiceError, OCRServiceError, Permane
 from mail_agent.graph.builder import MessageGraph
 from mail_agent.models import AttachmentMeta, AttachmentPlan, FinalSummary, MessageReference
 from mail_agent.storage.processing_repository import ProcessingRepository, record_id
+from mail_agent.summarization.classification import EmailClassification
+
+
+def _classification() -> EmailClassification:
+    return EmailClassification(
+        status="classified",
+        class_code="OTHER_EQUIPMENT",
+        class_name_ru="Прочее промышленное оборудование",
+        reason_ru="Письмо связано с промышленным оборудованием вне специальных направлений.",
+        confidence=0.7,
+        message_ru="Класс письма: OTHER_EQUIPMENT — Прочее промышленное оборудование",
+    )
 
 
 class Mail:
@@ -44,17 +56,19 @@ class Analysis:
     settings = SimpleNamespace(limits=LimitsSettings(), mail=SimpleNamespace(max_message_size=100_000))
 
     def summarize(self, message, body, attachments, warnings):
-        return FinalSummary(summary_ru="итог", confidence=1)
+        return FinalSummary(summary_ru="итог", classification=_classification(), confidence=1)
 
 
 class ResultsAPI:
     def __init__(self, events: list[str]) -> None:
         self.events = events
         self.results: list[dict[str, object]] = []
+        self.payloads: list[dict[str, object]] = []
 
     def persist(self, payload, *, raw_email_path, attachment_paths):
         del raw_email_path, attachment_paths
         self.events.append("api")
+        self.payloads.append(payload)
         self.results.append(
             {
                 "summary": payload["agent_result"]["summary"],
@@ -125,7 +139,7 @@ class RetryableSummaryAnalysis(Analysis):
         self.summarize_calls += 1
         if self.summarize_calls == 1:
             raise ExternalServiceError("temporary summary failure")
-        return FinalSummary(summary_ru="итог после повтора", confidence=1)
+        return FinalSummary(summary_ru="итог после повтора", classification=_classification(), confidence=1)
 
 
 class RetryableReadMail(Mail):
@@ -201,7 +215,7 @@ class AttachmentFailureAnalysis(Analysis):
     def summarize(self, message, body, attachments, warnings):
         self.received_body = body
         self.received_attachments = attachments
-        return FinalSummary(summary_ru="Сводка текста пересылки", confidence=0.8)
+        return FinalSummary(summary_ru="Сводка текста пересылки", classification=_classification(), confidence=0.8)
 
 
 def _image_attachment(path: Path) -> AttachmentMeta:
@@ -222,11 +236,12 @@ def _image_attachment(path: Path) -> AttachmentMeta:
 def test_langgraph_commits_api_before_seen_and_preserves_duplicate_headers(tmp_path) -> None:
     mail = Mail()
     repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
+    results_api = ResultsAPI(mail.events)
     graph = MessageGraph(
         mail=mail,
         repository=repository,
         analysis=Analysis(),
-        results_api=ResultsAPI(mail.events),
+        results_api=results_api,
         checkpoint_db=tmp_path / "check.sqlite",
         pipeline_version="1",
     )
@@ -237,6 +252,8 @@ def test_langgraph_commits_api_before_seen_and_preserves_duplicate_headers(tmp_p
     assert state["status"] == "completed"
     assert mail.events == ["fetch", "api", "read"]
     assert state["message_metadata"]["headers"] == [["X", "Y"], ["X", "Z"]]
+    assert state["summary"]["classification"]["status"] == "classified"
+    assert results_api.payloads[-1]["agent_result"]["summary"]["classification"]["status"] == "classified"
 
 
 def test_langgraph_recovery_after_result_commit_retries_only_seen(tmp_path) -> None:
@@ -289,7 +306,9 @@ def test_graph_writes_manual_review_record_when_summarization_fails(tmp_path, ca
     assert item["manual_review_stage"] == "summarize_message"
     assert item["manual_review_error_type"] == "PermanentError"
     assert state["summary"]["summary_ru"] == "Автоматическая обработка не завершена. Письмо требует ручной проверки."
+    assert state["summary"]["classification"]["status"] == "manual_review"
     assert results_api.results[-1]["summary"]["confidence"] == 0
+    assert results_api.results[-1]["summary"]["classification"]["status"] == "manual_review"
     assert state["errors"][-1] == {"stage": "summarize_message", "type": "PermanentError"}
     assert "manual_review_record_created" in [record.getMessage() for record in caplog.records]
     assert "Текст письма не должен" not in caplog.text
@@ -331,6 +350,7 @@ def test_manual_review_names_unprocessed_attachments_without_extracted_text(tmp_
     ]
     assert "Сырой текст таблицы" not in summary["summary_ru"]
     assert "Сырой текст таблицы" not in summary["attachment_summaries"][0]
+    assert summary["classification"]["status"] == "manual_review"
 
 
 def test_attachment_failure_keeps_forwarded_email_summary_flow(tmp_path) -> None:

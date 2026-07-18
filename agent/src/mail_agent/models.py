@@ -7,6 +7,8 @@ from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, Field
 
+from .summarization.classification import EmailClassification
+
 ToolName = Literal["programmatic", "vision", "ocr", "skip"]
 
 
@@ -61,6 +63,7 @@ class AttachmentResult(AttachmentMeta):
 
 class FinalSummary(BaseModel):
     summary_ru: str
+    classification: EmailClassification
     key_facts_ru: list[str] = Field(default_factory=list)
     action_items_ru: list[str] = Field(default_factory=list)
     deadlines: list[str] = Field(default_factory=list)

@@ -13,9 +13,11 @@ from ..config import AgentSettings
 from ..exceptions import LLMResponseFormatError, PermanentError
 from ..logging import log_event
 from ..models import AttachmentDigest, AttachmentMeta, AttachmentPlan, FinalSummary, OCRCorrection, ToolName
+from .classification import EmailClassification, manual_review_classification
 from .prompts import (
     ATTACHMENT_CHUNK_SYSTEM,
     ATTACHMENT_REDUCE_SYSTEM,
+    CLASSIFICATION_SYSTEM,
     CORRECTION_SYSTEM,
     FORWARDED_MESSAGE_CHUNK_SYSTEM,
     FORWARDED_MESSAGE_REDUCE_SYSTEM,
@@ -389,12 +391,25 @@ class AnalysisService:
                 result.warnings_ru.append(notice)
         return result
 
-    @staticmethod
-    def _final_from_digest(digest: AttachmentDigest, warning: str) -> FinalSummary:
+    def _classify_compact(self, evidence: dict[str, Any]) -> EmailClassification:
+        """Классифицирует итоговые доказательства, когда полная сводка недоступна."""
+
+        try:
+            return self.llm.structured(
+                CLASSIFICATION_SYSTEM,
+                json.dumps(evidence, ensure_ascii=False),
+                EmailClassification,
+                max_tokens=min(500, self.settings.llm.max_completion_tokens),
+            )
+        except PermanentError:
+            return manual_review_classification()
+
+    def _final_from_digest(self, digest: AttachmentDigest, warning: str, evidence: dict[str, Any]) -> FinalSummary:
         """Преобразует короткую валидную сводку в итог без копирования исходного письма."""
 
         return FinalSummary(
             summary_ru=digest.summary_ru,
+            classification=self._classify_compact(evidence),
             key_facts_ru=digest.key_facts_ru,
             action_items_ru=digest.action_items_ru,
             deadlines=digest.deadlines,
@@ -433,6 +448,7 @@ class AnalysisService:
                 return self._final_from_digest(
                     digest,
                     "Итоговая сводка сформирована из поэтапной сводки пересланных сообщений.",
+                    evidence,
                 )
 
         message_evidence = {
@@ -461,6 +477,7 @@ class AnalysisService:
                 return self._final_from_digest(
                     digest,
                     "Итоговая сводка сформирована в сокращённом режиме после повторных попыток.",
+                    evidence,
                 )
             except PermanentError as exc:
                 last_error = exc
