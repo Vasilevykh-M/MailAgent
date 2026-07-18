@@ -30,13 +30,14 @@ make once
 
 `agent/.env.example` содержит names переменных worker; перед запуском экспортируйте нужные значения в окружение. Не используйте один файл `.env` одновременно для Compose и worker без явной загрузки окружения.
 
-## Ubuntu 24.04: один хост с RTX 2060
+## Ubuntu 24.04: агент и отдельный LLM-хост с RTX 5090
 
-На Linux-хосте с RTX 2060 запускаются Results API, LLM и worker. OCR уже работает
-на отдельной CPU-машине по адресу `192.14.88.2:8000`. По умолчанию Compose
-публикует Results API только на `127.0.0.1:8080`; PostgreSQL и MinIO не
-публикуются. Для явного read-only теста в доверенной LAN используйте параметры
-`RESULTS_API_HOST` и `ALLOW_ANONYMOUS_READER`, описанные выше.
+Results API и worker запускаются на хосте агента. OCR уже работает на отдельной
+CPU-машине по адресу `192.14.88.2:8000`; LLM работает на Ubuntu 24.04 с RTX 5090
+по адресу `192.168.88.251:8001`. По умолчанию Compose публикует Results API
+только на `127.0.0.1:8080`; PostgreSQL и MinIO не публикуются. Для явного
+read-only теста в доверенной LAN используйте параметры `RESULTS_API_HOST` и
+`ALLOW_ANONYMOUS_READER`, описанные выше.
 
 Сначала проверьте хост и подготовьте инфраструктуру. Рабочий `.env` содержит
 секреты, поэтому создаётся только на сервере и не добавляется в Git:
@@ -80,16 +81,13 @@ curl --fail --silent --show-error --connect-timeout 3 \
 На OCR-хосте используйте [cpu.env.example](ocr-service/cpu.env.example) и
 ограничьте TCP/8000 firewall только IP Linux-хоста с агентом.
 
-Затем в третьей shell-сессии запустите LLM. Профиль использует
-`Qwen/Qwen3.5-9B` в FP16, текстовый режим и CPU-offload; для карты с 8 ГиБ VRAM
-нужны как минимум 32 ГиБ RAM. Сначала проверьте свободную память и GPU, затем
-запустите сервис. Подробные ограничения и диагностика приведены в
-[llm-service/README.md](llm-service/README.md).
+На LLM-хосте `192.168.88.251` запустите сервис. Профиль использует
+`Qwen/Qwen3.5-9B` в BF16, текстовый режим и не использует CPU-offload. Подробные
+ограничения и диагностика приведены в [llm-service/README.md](llm-service/README.md).
 
 ```bash
-cd llm-service
+cd ~/MailAgent/llm-service
 nvidia-smi --query-gpu=name,memory.total,memory.free,compute_cap,driver_version --format=csv,noheader
-free -h
 cp config.mk.example config.mk
 make check-config
 make install
@@ -99,7 +97,8 @@ make health
 make smoke
 ```
 
-После успешного `make health` подготовьте агент и запустите его на том же хосте.
+После успешного `make health` на LLM-хосте подготовьте агент и запустите его на
+хосте агента.
 Значение `RESULTS_API_KEY` должно совпадать с `WRITER_API_KEY` из инфраструктурного
 файла; не записывайте его в `agent/config.yaml`.
 
@@ -107,7 +106,7 @@ make smoke
 cd ..
 cp agent/config.example.yaml agent/config.yaml
 cp yandex/mail/.env.example yandex/mail/.env
-export LLM_BASE_URL=http://127.0.0.1:8001/v1
+export LLM_BASE_URL=http://192.168.88.251:8001/v1
 export LLM_API_KEY='set-from-secret-store-if-required'
 export LLM_MODEL=qwen3.5-9b
 export OCR_BASE_URL=http://192.14.88.2:8000
@@ -121,10 +120,11 @@ uv run --project agent mail-agent worker
 ```
 
 Не подставляйте реальные секреты в repository-примеры и не открывайте `8001`,
-`8080`, PostgreSQL или MinIO во внешний интернет. TCP/8080 без reader key
-допустим только в явно разрешённой доверенной LAN. TCP/8000 OCR разрешайте только
-между агентом и OCR-хостом. Для Docker Engine на Ubuntu 24.04, используемого
-инфраструктурными контейнерами, применяйте
+`8080`, PostgreSQL или MinIO во внешний интернет. TCP/8001 разрешайте только
+между агентом и LLM-хостом; TCP/8080 без reader key допустим только в явно
+разрешённой доверенной LAN. TCP/8000 OCR разрешайте только между агентом и
+OCR-хостом. Для Docker Engine на Ubuntu 24.04, используемого инфраструктурными
+контейнерами, применяйте
 [официальную инструкцию Docker](https://docs.docker.com/engine/install/ubuntu/).
 
 ## Компоненты

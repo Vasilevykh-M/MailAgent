@@ -2,7 +2,8 @@
 
 ## Service contract
 
-This repository runs `Qwen/Qwen3.5-9B` with vLLM and native Ray on one Linux host with one visible RTX 2060.
+This repository runs `Qwen/Qwen3.5-9B` with vLLM and native Ray on one Ubuntu 24.04
+host with one visible RTX 5090.
 
 The Makefile is the only operational interface. Do not add required wrapper scripts and do not load `.env` files.
 
@@ -28,7 +29,9 @@ make stop
 
 ## Configuration
 
-Use `config.mk` for non-secret node configuration. The required one-host profile is `config.mk.example`; `config.worker.mk.example` is optional and not used on a single RTX 2060.
+Use `config.mk` for non-secret node configuration. The required one-host profile is
+`config.mk.example`; `config.worker.mk.example` is optional and not used on the
+single RTX 5090 host.
 
 Pass `VLLM_API_KEY` and `HF_TOKEN` through the process environment. Never commit real secrets.
 

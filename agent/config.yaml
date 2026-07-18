@@ -17,7 +17,7 @@ mail:
   max_message_size: 26214400
 
 llm:
-  base_url: http://192.14.88.2:8001/v1
+  base_url: http://192.168.88.251:8001/v1
   # Оставлено пустым: модель будет получена из GET /v1/models.
   model: ""
   timeout_seconds: 180

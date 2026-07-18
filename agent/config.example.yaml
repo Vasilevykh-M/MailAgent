@@ -11,7 +11,7 @@ mail:
   max_concurrent_messages: 1
   mark_read_after_success: true
 llm:
-  base_url: http://127.0.0.1:8001/v1
+  base_url: http://192.168.88.251:8001/v1
   model: qwen3.5-9b
   # Количество попыток получить итоговую сводку до сокращённого fallback.
   final_summary_attempts: 3

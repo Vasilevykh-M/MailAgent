@@ -29,7 +29,7 @@ class MailSettings(_Model):
 
 
 class LLMSettings(_Model):
-    base_url: str = "http://127.0.0.1:8001/v1"
+    base_url: str = "http://192.168.88.251:8001/v1"
     api_key: str = ""
     model: str = ""
     timeout_seconds: PositiveInt = 180

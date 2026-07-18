@@ -1,19 +1,17 @@
-# Профиль одного Linux-хоста с одной RTX 2060. Скопируйте как config.mk.
+# Профиль Ubuntu 24.04 с одной RTX 5090. Скопируйте как config.mk.
 NODE_ROLE := head
 
 MODEL := Qwen/Qwen3.5-9B
 SERVED_MODEL_NAME := qwen3.5-9b
 
-# API предназначен для локального mail-agent. Для удалённых клиентов используйте
-# reverse proxy с TLS, а не открывайте vLLM напрямую.
-HOST := 127.0.0.1
-BIND_HOST := 127.0.0.1
+# API доступен в доверенной LAN только на IP этого LLM-хоста.
+HOST := 192.168.88.251
+BIND_HOST := 192.168.88.251
 PORT := 8001
 
-# Ray требует фактический адрес хоста, а не loopback. При нескольких сетевых
-# интерфейсах задайте один private/VPN IP вручную в обеих строках.
-RAY_HEAD_IP := $(shell hostname -I 2>/dev/null | awk '{print $$1}')
-RAY_NODE_IP := $(RAY_HEAD_IP)
+# Ray требует фактический адрес хоста, а не loopback.
+RAY_HEAD_IP := 192.168.88.251
+RAY_NODE_IP := 192.168.88.251
 RAY_PORT := 6379
 RAY_EXPECTED_NODES := 1
 RAY_EXPECTED_GPUS := 1
@@ -32,13 +30,12 @@ TENSOR_PARALLEL_SIZE := 1
 PIPELINE_PARALLEL_SIZE := 1
 DISTRIBUTED_EXECUTOR_BACKEND := ray
 
-# Профиль для 8 ГиБ VRAM: 0.90 оставляет KV-cache после загрузки весов.
-MAX_MODEL_LEN := 4096
-MAX_NUM_SEQS := 1
+# 32 ГиБ VRAM RTX 5090: веса Qwen помещаются в GPU без CPU-offload.
+MAX_MODEL_LEN := 8192
+MAX_NUM_SEQS := 2
 GPU_MEMORY_UTILIZATION := 0.90
-# Нужны минимум 32 ГиБ RAM: веса, не поместившиеся в VRAM, загружаются в RAM.
-CPU_OFFLOAD_GB := 14
-DTYPE := half
+CPU_OFFLOAD_GB := 0
+DTYPE := bfloat16
 KV_CACHE_DTYPE := auto
 ENABLE_PREFIX_CACHING := false
 CALCULATE_KV_SCALES := false

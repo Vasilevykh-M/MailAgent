@@ -9,9 +9,9 @@ sudo apt-get update
 sudo apt-get install -y make curl ninja-build
 ```
 
-Нужны одна доступная GPU `0`, не менее 32 ГиБ RAM и `uv` в `PATH`. Установленный
-CUDA Toolkit не используется для выбора пакета vLLM; работоспособность CUDA
-проверяется командой `make install`.
+Нужны одна доступная RTX 5090 как GPU `0` и `uv` в `PATH`. Установленный CUDA
+Toolkit не используется для выбора пакета vLLM; работоспособность CUDA проверяется
+командой `make install`.
 
 ## Конфигурация и запуск
 
@@ -23,12 +23,11 @@ make install
 make start
 ```
 
-`config.mk.example` задаёт API на `127.0.0.1`, а для Ray выбирает первый адрес из
-`hostname -I`; при нескольких интерфейсах укажите один private/VPN IP вручную в
-`RAY_HEAD_IP` и `RAY_NODE_IP`. Профиль использует одну GPU, FP16, контекст 4096,
-один параллельный запрос, `GPU_MEMORY_UTILIZATION=0.90` и 14 ГиБ CPU-offload.
-Веса модели сохраняются в `cache/huggingface`; не удаляйте этот каталог при
-обычном перезапуске.
+`config.mk.example` задаёт API и Ray на `192.168.88.251`; при изменении адреса
+синхронно поменяйте `HOST`, `BIND_HOST`, `RAY_HEAD_IP` и `RAY_NODE_IP`. Профиль
+использует одну GPU, BF16, контекст 8192, до двух одновременных последовательностей,
+`GPU_MEMORY_UTILIZATION=0.90` и без CPU-offload. Веса модели сохраняются в
+`cache/huggingface`; не удаляйте этот каталог при обычном перезапуске.
 
 При необходимости передайте секреты только текущему процессу:
 
@@ -50,11 +49,10 @@ make cluster-status
 ```
 
 При ошибке `No available memory for the cache blocks` остановите сервис и
-установите `GPU_MEMORY_UTILIZATION := 0.90`: этот параметр определяет доступный
-KV-cache. При фактической CUDA OOM уменьшите сначала `MAX_MODEL_LEN` до `2048`,
-затем `GPU_MEMORY_UTILIZATION` до `0.85`. Если ошибка указывает на RAM, освободите
-или увеличьте память: уменьшение `CPU_OFFLOAD_GB` при 8 ГиБ VRAM не является
-исправлением, потому что весам потребуется больше VRAM.
+уменьшите сначала `MAX_MODEL_LEN` до `4096`, затем
+`GPU_MEMORY_UTILIZATION` до `0.85`. `GPU_MEMORY_UTILIZATION` определяет объём
+памяти для весов, активаций и KV-cache. Не включайте CPU-offload для этого профиля:
+он замедляет инференс и не требуется 32 ГиБ VRAM RTX 5090.
 
 ## Остановка
 

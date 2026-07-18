@@ -24,14 +24,14 @@ RAY_MARKER_FILE := $(RUN_DIR)/ray-node.marker
 NODE_ROLE ?= head
 MODEL ?= Qwen/Qwen3.5-9B
 SERVED_MODEL_NAME ?= qwen3.5-9b
-HOST ?= 127.0.0.1
-BIND_HOST ?= 127.0.0.1
+HOST ?= 192.168.88.251
+BIND_HOST ?= 192.168.88.251
 PORT ?= 8001
 CUDA_VISIBLE_DEVICES ?= 0
 HF_HOME ?= $(CURDIR)/cache/huggingface
 
-RAY_HEAD_IP ?= 127.0.0.1
-RAY_NODE_IP ?= 127.0.0.1
+RAY_HEAD_IP ?= 192.168.88.251
+RAY_NODE_IP ?= 192.168.88.251
 RAY_PORT ?= 6379
 RAY_EXPECTED_NODES ?= 1
 RAY_EXPECTED_GPUS ?= 1
@@ -48,11 +48,11 @@ RAY_ADDRESS := $(RAY_HEAD_IP):$(RAY_PORT)
 TENSOR_PARALLEL_SIZE ?= 1
 PIPELINE_PARALLEL_SIZE ?= 1
 DISTRIBUTED_EXECUTOR_BACKEND ?= ray
-MAX_MODEL_LEN ?= 4096
-MAX_NUM_SEQS ?= 1
+MAX_MODEL_LEN ?= 8192
+MAX_NUM_SEQS ?= 2
 GPU_MEMORY_UTILIZATION ?= 0.90
-CPU_OFFLOAD_GB ?= 14
-DTYPE ?= half
+CPU_OFFLOAD_GB ?= 0
+DTYPE ?= bfloat16
 KV_CACHE_DTYPE ?= auto
 ENABLE_PREFIX_CACHING ?= false
 CALCULATE_KV_SCALES ?= false
@@ -102,7 +102,7 @@ endif
 
 help:
 	@printf '%s\n' \
-	  'Стартовый профиль: один Linux-хост, одна RTX 2060, Qwen3.5-9B.' \
+	  'Стартовый профиль: Ubuntu 24.04, одна RTX 5090, Qwen3.5-9B.' \
 	  '' \
 	  'make install          создать .venv и установить зависимости из uv.lock' \
 	  'make start            head: Ray + vLLM в фоне' \
@@ -140,8 +140,8 @@ check-config:
 	@test $$(( $(TENSOR_PARALLEL_SIZE) * $(PIPELINE_PARALLEL_SIZE) )) -eq "$(RAY_EXPECTED_GPUS)"
 	@test "$(MAX_MODEL_LEN)" -gt 0 && test "$(MAX_NUM_SEQS)" -gt 0
 	@test "$(CPU_OFFLOAD_GB)" -ge 0
-	@test "$(DTYPE)" = half || { echo 'DTYPE must be half for RTX 2060.' >&2; exit 1; }
-	@test "$(LANGUAGE_MODEL_ONLY)" = true || { echo 'LANGUAGE_MODEL_ONLY must be true for the RTX 2060 profile.' >&2; exit 1; }
+	@[[ "$(DTYPE)" = half || "$(DTYPE)" = bfloat16 ]] || { echo 'DTYPE must be half or bfloat16.' >&2; exit 1; }
+	@test "$(LANGUAGE_MODEL_ONLY)" = true || { echo 'LANGUAGE_MODEL_ONLY must be true for this text-only profile.' >&2; exit 1; }
 	@awk 'BEGIN { value=$(GPU_MEMORY_UTILIZATION); exit !(value >= 0.50 && value < 1.0) }' || { echo 'GPU_MEMORY_UTILIZATION must be in [0.50, 1.0).' >&2; exit 1; }
 	@if [[ "$(NODE_ROLE)" = head && "$(RAY_NODE_IP)" != "$(RAY_HEAD_IP)" ]]; then echo 'On head, RAY_NODE_IP must equal RAY_HEAD_IP.' >&2; exit 1; fi
 	@if [[ "$(NODE_ROLE)" = worker && "$(RAY_NODE_IP)" = "$(RAY_HEAD_IP)" ]]; then echo 'Worker RAY_NODE_IP must differ from RAY_HEAD_IP.' >&2; exit 1; fi

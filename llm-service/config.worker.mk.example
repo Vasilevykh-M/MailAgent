@@ -1,4 +1,4 @@
-# Не используйте этот шаблон в профиле одной RTX 2060. Он оставлен для
+# Не используйте этот шаблон в профиле одной RTX 5090. Он оставлен для
 # совместимой двухузловой конфигурации с двумя GPU.
 NODE_ROLE := worker
 
@@ -6,12 +6,12 @@ MODEL := Qwen/Qwen3.5-9B
 SERVED_MODEL_NAME := qwen3.5-9b
 
 # API still runs on the head server.
-HOST := 192.14.88.2
+HOST := 192.168.88.251
 BIND_HOST := 0.0.0.0
 PORT := 8001
 
 # RAY_HEAD_IP is the head's private/VPN IP.
-RAY_HEAD_IP := 192.14.88.2
+RAY_HEAD_IP := 192.168.88.251
 # Replace with this worker's private/VPN IP.
 RAY_NODE_IP := 10.10.0.12
 RAY_PORT := 6379

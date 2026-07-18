@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from mail_agent.config import DashboardSettings
+from mail_agent.config import DashboardSettings, LLMSettings
+
+
+def test_llm_default_targets_the_dedicated_llm_host() -> None:
+    assert LLMSettings().base_url == "http://192.168.88.251:8001/v1"
 
 
 @pytest.mark.parametrize("host", ["localhost", "127.0.0.1", "::1", "192.168.88.32", "10.10.0.12"])
