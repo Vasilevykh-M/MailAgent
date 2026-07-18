@@ -36,6 +36,33 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 - `/health/live` — liveness-probe;
 - `/health/ready` — readiness-probe.
 
+## Ubuntu 24.04: CPU-профиль
+
+Для почтового агента на этом хосте OCR намеренно работает на CPU. Используйте
+несекретный шаблон `cpu.env.example`; GPU-wheel PaddlePaddle не устанавливается:
+
+```bash
+cd ocr-service
+uv sync --extra dev --python 3.11
+cp cpu.env.example .env
+uv run python -c 'import paddle; print(paddle.device.get_device())'
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Команда проверки должна вывести `cpu`. Первый запрос скачает официальные артефакты
+PaddleOCR в `PADDLE_MODEL_HOME`, поэтому каталог должен сохраняться между
+перезапусками и хосту нужен доступ к выбранному источнику моделей. Не заменяйте
+CPU-wheel на GPU-wheel в этом environment.
+
+В этом профиле OCR принимает запросы с другого хоста. API не использует ключ
+доступа, поэтому на OCR-хосте разрешите TCP/8000 только адресу агента (замените
+`AGENT_IP`):
+
+```bash
+sudo ufw allow from AGENT_IP to any port 8000 proto tcp
+sudo ufw deny 8000/tcp
+```
+
 ## Docker
 
 ```bash

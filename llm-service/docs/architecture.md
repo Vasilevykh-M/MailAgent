@@ -1,21 +1,29 @@
 # Архитектура
 
-На каждом сервере работает локальный Ray node с одной RTX 5090. Head также запускает один процесс `vllm serve`, который подключается к существующему Ray-кластеру.
+Стартовый профиль использует один локальный Ray node и одну RTX 2060. Один процесс
+`vllm serve` подключается к этому node и поднимает OpenAI-совместимый API только на
+loopback-интерфейсе.
 
 ```text
-client -> head:8001 -> vLLM driver -> Ray placement group
-                                      |- head GPU: pipeline stage 0
-                                      `- worker GPU: pipeline stage 1
+mail-agent -> 127.0.0.1:8001/v1 -> vLLM driver -> Ray -> GPU 0 (RTX 2060)
 ```
 
 Используется:
 
 ```text
 tensor_parallel_size = 1
-pipeline_parallel_size = 2
+pipeline_parallel_size = 1
 distributed_executor_backend = ray
+language_model_only = true
 ```
 
-Вся операционная логика находится в Makefile. `config.mk` содержит несекретные параметры узла. Worker не поднимает отдельный HTTP API.
+`Qwen/Qwen3.5-9B` является мультимодальной моделью, но агент передаёт только
+текст. Флаг `--language-model-only` не загружает vision-часть и оставляет больше
+памяти для языковой модели. Необходимые для модели веса сверх доступной VRAM
+выгружаются в CPU RAM через `--cpu-offload-gb`; это обменяет скорость на возможность
+запуска на 8 ГиБ GPU.
 
-Ray стартует из того же `.venv`, где установлен vLLM, поэтому удалённые Ray workers используют совместимое Python-окружение. `VLLM_HOST_IP` задаётся отдельно при запуске Ray на каждом узле.
+Вся операционная логика находится в Makefile. `config.mk` содержит только
+несекретные параметры. `VLLM_API_KEY` и `HF_TOKEN` передаются в окружении процесса.
+Шаблон worker сохранён для отдельного двухузлового расширения, но не участвует в
+развёртывании на одной RTX 2060.

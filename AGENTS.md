@@ -5,7 +5,7 @@
 | Directory      | Purpose                                                       | Working Rules                                                                                                                                               |
 | -------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ocr-service/` | FastAPI service for OCR and document parsing using PaddleOCR. | A standalone Python project. All changes to the service, its tests, Docker configuration, and documentation must be made within this directory.             |
-| `llm-service/` | vLLM service for Qwen3.6.                                     | Before starting any work, you must read [`llm-service/AGENTS.md`](llm-service/AGENTS.md). Its rules are stricter and take precedence within this directory. |
+| `llm-service/` | vLLM service for Qwen3.5-9B.                                 | Before starting any work, you must read [`llm-service/AGENTS.md`](llm-service/AGENTS.md). Its rules are stricter and take precedence within this directory. |
 | `yandex/`      | Independent SDKs for Yandex Mail and Yandex Disk.             | Protected area: do not modify without a separate, explicit user request.                                                                                    |
 
 The repository root does not contain shared dependency configuration, Docker Compose, or CI configuration. Do not add them unless the user explicitly requests integration between the services.
@@ -93,7 +93,7 @@ After making changes, update the following files when necessary:
 
 ## `llm-service/`
 
-For any task within `llm-service/`, you must apply the rules in its local [`AGENTS.md`](llm-service/AGENTS.md). In particular, do not change the Qwen3.6 model, add a proxy server, weaken SSRF protections, or run resource-intensive checks without a suitable Linux/GPU environment.
+For any task within `llm-service/`, you must apply the rules in its local [`AGENTS.md`](llm-service/AGENTS.md). In particular, do not change the Qwen3.5-9B model, add a proxy server, weaken SSRF protections, or run resource-intensive checks without a suitable Linux/GPU environment.
 
 ## Final Report
 

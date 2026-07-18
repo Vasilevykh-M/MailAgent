@@ -1,222 +1,138 @@
-# Qwen3.6-27B-FP8 через vLLM и Ray на двух серверах
+# Qwen3.5-9B через vLLM и Ray на одной RTX 2060
 
-Сервис запускает `Qwen/Qwen3.6-27B-FP8` на двух Linux-серверах, по одной RTX 5090 32 ГБ на каждом. Управление выполняется **только через Makefile**. Wrapper-скриптов и загрузки `.env` нет.
-
-```text
-head:   RTX 5090 + Ray head + vLLM API :8001 + pipeline stage 0
-worker: RTX 5090 + Ray worker            + pipeline stage 1
-
-TP=1 × PP=2 = 2 GPU
-```
-
-API доступен клиентам по адресу:
+Сервис запускает `Qwen/Qwen3.5-9B` на одном Linux-хосте с одной видимой GPU.
+Управление выполняется **только через Makefile**: wrapper-скриптов и загрузки
+`.env` нет.
 
 ```text
-http://192.14.88.2:8001/v1
+mail-agent -> 127.0.0.1:8001/v1 -> vLLM -> Ray (локальный node) -> RTX 2060
 ```
 
-## 1. Требования
+API намеренно привязан к `127.0.0.1:8001`. Он доступен только процессам этого
+хоста, включая mail-agent. Не открывайте vLLM напрямую в интернет; для удалённого
+доступа нужен отдельный reverse proxy с TLS и аутентификацией.
 
-На обоих серверах:
+## Ограничения профиля RTX 2060
 
-- Linux x86_64;
-- одна RTX 5090, доступная как GPU `0`;
-- одинаковая копия сервиса и одинаковый `uv.lock`;
-- `uv`, `nvidia-smi`, `ninja`;
-- двусторонняя связь между приватными/VPN IP серверов.
+`Qwen3.5-9B` — мультимодальная модель. Этот агент передаёт в LLM только текст,
+поэтому профиль включает `--language-model-only`: визуальные модули модели не
+загружаются, а `OCR_FALLBACK_TO_VLM` у агента выключен.
 
-Ray, NCCL и PyTorch distributed не следует пускать через открытый интернет. Наиболее надёжный вариант — WireGuard или приватная сеть с разрешённым трафиком между двумя адресами целиком.
+Для RTX 2060 используется FP16 и выгрузка части весов в оперативную память:
 
-## 2. Установка на обоих серверах
+```make
+DTYPE := half
+MAX_MODEL_LEN := 4096
+MAX_NUM_SEQS := 1
+GPU_MEMORY_UTILIZATION := 0.80
+CPU_OFFLOAD_GB := 14
+LANGUAGE_MODEL_ONLY := true
+```
+
+Профиль рассчитан на карту с 8 ГиБ VRAM и **не менее 32 ГиБ RAM**. CPU-offload
+позволяет загрузить модель, но делает ответы заметно медленнее из-за передачи
+весов между RAM и GPU. Версия CUDA Toolkit из `nvcc` не используется как источник
+wheel vLLM; фактическую совместимость проверяет `make install` через PyTorch.
+
+До установки убедитесь, что драйвер видит карту и достаточно доступной RAM:
 
 ```bash
+nvidia-smi --query-gpu=name,memory.total,memory.free,compute_cap,driver_version --format=csv,noheader
+free -h
+```
+
+Если свободной RAM меньше 24 ГиБ или `make start` завершается ошибкой памяти, не
+запускайте mail-agent: сначала освободите/увеличьте RAM. Для ошибки CUDA OOM
+уменьшите в `config.mk` `MAX_MODEL_LEN` до `2048`, затем
+`GPU_MEMORY_UTILIZATION` до `0.70`; не увеличивайте параллелизм.
+
+## Установка и настройка
+
+На Ubuntu 24.04 нужны `make`, `curl`, `ninja-build`, доступный в `PATH` `uv`,
+драйвер NVIDIA и интернет для первого скачивания Python, пакетов и модели.
+Локальная Python из Ubuntu не обязана быть 3.13: `uv` загрузит её в управляемое
+окружение при `make install`.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y make curl ninja-build
+
 cd llm-service
+cp config.mk.example config.mk
+make check-config
 make install
 ```
 
-Команда создаёт `.venv`, устанавливает зафиксированные vLLM/Ray-зависимости и проверяет одну видимую CUDA GPU.
+`config.mk` — несекретный файл. Шаблон уже настроен для одного хоста и одной GPU
+`0`; IP-адреса Ray остаются loopback. Не меняйте `PIPELINE_PARALLEL_SIZE`,
+`RAY_EXPECTED_NODES` или `RAY_EXPECTED_GPUS` для этого профиля.
 
-## 3. Конфигурация head
-
-В архиве `config.mk` уже подготовлен как конфигурация head:
-
-```make
-NODE_ROLE := head
-HOST := 192.14.88.2
-BIND_HOST := 0.0.0.0
-PORT := 8001
-
-RAY_HEAD_IP := 192.14.88.2
-RAY_NODE_IP := 192.14.88.2
-```
-
-`HOST` — адрес API для клиентов. `RAY_HEAD_IP` и `RAY_NODE_IP` должны быть IP сетевого интерфейса head, который напрямую доступен worker.
-
-Когда `192.14.88.2` является публичным NAT-адресом, не используйте его как `RAY_NODE_IP`. Оставьте:
-
-```make
-HOST := 192.14.88.2
-```
-
-а для Ray укажите приватный/VPN IP head, например:
-
-```make
-RAY_HEAD_IP := 10.10.0.11
-RAY_NODE_IP := 10.10.0.11
-NCCL_SOCKET_IFNAME := wg0
-GLOO_SOCKET_IFNAME := wg0
-NCCL_IB_DISABLE := 1
-```
-
-## 4. Конфигурация worker
-
-На втором сервере:
+Репозиторий модели публичный, но при ограничениях Hugging Face можно передать
+токен только через окружение:
 
 ```bash
-cp config.worker.mk.example config.mk
-nano config.mk
+export HF_TOKEN='...'
 ```
 
-Обязательно задайте реальные адреса:
-
-```make
-NODE_ROLE := worker
-RAY_HEAD_IP := 10.10.0.11
-RAY_NODE_IP := 10.10.0.12
-
-NCCL_SOCKET_IFNAME := wg0
-GLOO_SOCKET_IFNAME := wg0
-NCCL_IB_DISABLE := 1
-```
-
-Все модельные параметры на head и worker должны совпадать.
-
-## 5. Запуск
-
-Откройте две SSH-сессии.
-
-Сначала на head:
+При необходимости защиты локального API перед первым запуском передайте ключ тем
+же способом:
 
 ```bash
+export VLLM_API_KEY='...'
+```
+
+Не сохраняйте эти значения в `config.mk` или в Git.
+
+## Запуск и проверка
+
+```bash
+cd llm-service
 make start
-```
-
-Head запустит локальный Ray и будет ждать два узла и две GPU.
-
-Затем на worker:
-
-```bash
-make start
-```
-
-Worker подключит свою RTX 5090 к Ray. После этого команда на head продолжит выполнение и запустит vLLM в фоне.
-
-Лог на head:
-
-```bash
 make logs
 ```
 
-Foreground-режим vLLM на head:
+Первый запуск скачивает веса в `cache/huggingface` и затем загружает модель. После
+строки о готовности API в логе выполните в другой shell-сессии:
 
 ```bash
-make run
+cd llm-service
+make health
+make models
+make smoke
 ```
 
-На worker для подключения используется `make start`, а не `make run`.
+Ожидаемый идентификатор модели в `/v1/models` — `qwen3.5-9b`. Для запуска в
+foreground вместо `make start` используйте `make run`.
 
-## 6. Проверка
-
-На любом сервере:
+Статус GPU, локального Ray и HTTP API:
 
 ```bash
 make status
 make cluster-status
 ```
 
-Ожидается:
+Нормальный вывод `make cluster-status` содержит один живой узел и `GPU=1.0`.
 
-```text
-Alive nodes: 2
-GPU=1.0 на каждом узле
-```
-
-На head или API-клиенте:
+## Остановка
 
 ```bash
-make health
-make models
-make smoke
-```
-
-Либо напрямую:
-
-```bash
-curl http://192.14.88.2:8001/health
-curl http://192.14.88.2:8001/v1/models
-```
-
-## 7. Остановка
-
-Сначала на head остановите API и локальный Ray:
-
-```bash
+cd llm-service
 make stop
 ```
 
-Затем на worker:
+Команда останавливает только vLLM с проверенным PID и Ray, отмеченный этим
+Makefile. Она не затрагивает другие процессы GPU.
 
-```bash
-make stop
-```
+## Дополнительный worker
 
-Команда использует PID-файл только для vLLM этого сервиса и marker-файл только для локального Ray, запущенного Makefile.
-
-## 8. Сетевые порты
-
-Makefile фиксирует основные Ray-порты:
-
-```text
-6379
-10002-10003
-11000-11100
-52365-52367
-```
-
-Однако NCCL/PyTorch могут создавать дополнительные межузловые TCP-соединения. Поэтому для VPN/приватной сети лучше разрешить весь TCP-трафик **только между IP head и worker**, а наружу открыть лишь `8001/tcp` для доверенных API-клиентов.
-
-## 9. Параметры модели
-
-Стартовый профиль:
-
-```make
-MODEL := Qwen/Qwen3.6-27B-FP8
-TENSOR_PARALLEL_SIZE := 1
-PIPELINE_PARALLEL_SIZE := 2
-DISTRIBUTED_EXECUTOR_BACKEND := ray
-MAX_MODEL_LEN := 8192
-MAX_NUM_SEQS := 1
-GPU_MEMORY_UTILIZATION := 0.90
-```
-
-При OOM сначала уменьшайте `MAX_MODEL_LEN`, затем `MAX_IMAGES_PER_PROMPT`. Не выставляйте `GPU_MEMORY_UTILIZATION := 1.0`.
-
-## 10. Секреты
-
-Не записывайте ключи в `config.mk`. Передавайте их через окружение:
-
-```bash
-export VLLM_API_KEY='...'
-export HF_TOKEN='...'
-make start
-```
-
-При API-ключе используйте то же окружение для `make models` и `make smoke`.
+`config.worker.mk.example` сохранён для отдельной двухузловой конфигурации и не
+нужен для данного запуска. Не копируйте его на единственный сервер с RTX 2060.
 
 ## Основные команды
 
 ```bash
 make help
+make check-config
 make install
 make start
 make run

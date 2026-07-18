@@ -12,19 +12,19 @@ mail:
   mark_read_after_success: true
 llm:
   base_url: http://127.0.0.1:8001/v1
-  model: ""
+  model: qwen3.5-9b
   # Количество попыток получить итоговую сводку до сокращённого fallback.
   final_summary_attempts: 3
   # Общий лимит текста письма и вложений в одном запросе к vLLM.
-  max_text_chars_per_request: 8000
-  max_completion_tokens: 1200
+  max_text_chars_per_request: 6000
+  max_completion_tokens: 1000
   # Коррекция OCR возвращает текст целиком, поэтому её лимит выше общего.
-  max_ocr_correction_tokens: 3000
+  max_ocr_correction_tokens: 1000
   max_image_bytes_per_request: 4194304
 ocr:
-  base_url: http://127.0.0.1:8000
+  base_url: http://192.14.88.2:8000
   # При ошибке OCR попытаться извлечь PDF/изображения через VLM.
-  fallback_to_vlm: true
+  fallback_to_vlm: false
 results_api:
   base_url: http://127.0.0.1:8080
   # Ключ остаётся пустым: передавайте RESULTS_API_KEY только через окружение.

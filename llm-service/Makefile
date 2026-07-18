@@ -22,19 +22,19 @@ PID_FILE := $(RUN_DIR)/vllm.pid
 RAY_MARKER_FILE := $(RUN_DIR)/ray-node.marker
 
 NODE_ROLE ?= head
-MODEL ?= Qwen/Qwen3.6-27B-FP8
-SERVED_MODEL_NAME ?= qwen3.6-27b-fp8
-HOST ?= 192.14.88.2
-BIND_HOST ?= 0.0.0.0
+MODEL ?= Qwen/Qwen3.5-9B
+SERVED_MODEL_NAME ?= qwen3.5-9b
+HOST ?= 127.0.0.1
+BIND_HOST ?= 127.0.0.1
 PORT ?= 8001
 CUDA_VISIBLE_DEVICES ?= 0
 HF_HOME ?= $(CURDIR)/cache/huggingface
 
-RAY_HEAD_IP ?= 192.14.88.2
-RAY_NODE_IP ?= 192.14.88.2
+RAY_HEAD_IP ?= 127.0.0.1
+RAY_NODE_IP ?= 127.0.0.1
 RAY_PORT ?= 6379
-RAY_EXPECTED_NODES ?= 2
-RAY_EXPECTED_GPUS ?= 2
+RAY_EXPECTED_NODES ?= 1
+RAY_EXPECTED_GPUS ?= 1
 RAY_CLUSTER_START_TIMEOUT ?= 900
 RAY_NODE_MANAGER_PORT ?= 10002
 RAY_OBJECT_MANAGER_PORT ?= 10003
@@ -46,22 +46,21 @@ RAY_RUNTIME_ENV_AGENT_PORT ?= 52367
 RAY_ADDRESS := $(RAY_HEAD_IP):$(RAY_PORT)
 
 TENSOR_PARALLEL_SIZE ?= 1
-PIPELINE_PARALLEL_SIZE ?= 2
+PIPELINE_PARALLEL_SIZE ?= 1
 DISTRIBUTED_EXECUTOR_BACKEND ?= ray
-MAX_MODEL_LEN ?= 8192
+MAX_MODEL_LEN ?= 4096
 MAX_NUM_SEQS ?= 1
-GPU_MEMORY_UTILIZATION ?= 0.90
-CPU_OFFLOAD_GB ?= 0
-SWAP_SPACE_GB ?= 4
-DTYPE ?= auto
+GPU_MEMORY_UTILIZATION ?= 0.80
+CPU_OFFLOAD_GB ?= 14
+SWAP_SPACE_GB ?= 8
+DTYPE ?= half
 KV_CACHE_DTYPE ?= auto
-ENABLE_PREFIX_CACHING ?= true
+ENABLE_PREFIX_CACHING ?= false
 CALCULATE_KV_SCALES ?= false
-MAX_IMAGES_PER_PROMPT ?= 1
-REASONING_PARSER ?= qwen3
-ENABLE_AUTO_TOOL_CHOICE ?= true
-TOOL_CALL_PARSER ?= qwen3_coder
-ALLOWED_MEDIA_DOMAIN ?= invalid.invalid
+LANGUAGE_MODEL_ONLY ?= true
+REASONING_PARSER ?=
+ENABLE_AUTO_TOOL_CHOICE ?= false
+TOOL_CALL_PARSER ?=
 
 NCCL_SOCKET_IFNAME ?=
 GLOO_SOCKET_IFNAME ?=
@@ -81,16 +80,19 @@ VLLM_BASE_ARGS = serve "$(MODEL)" \
 	--cpu-offload-gb "$(CPU_OFFLOAD_GB)" \
 	--swap-space "$(SWAP_SPACE_GB)" \
 	--dtype "$(DTYPE)" \
-	--kv-cache-dtype "$(KV_CACHE_DTYPE)" \
-	--reasoning-parser "$(REASONING_PARSER)" \
-	--limit-mm-per-prompt '{"image":$(MAX_IMAGES_PER_PROMPT),"video":0}' \
-	--allowed-media-domains "$(ALLOWED_MEDIA_DOMAIN)"
+	--kv-cache-dtype "$(KV_CACHE_DTYPE)"
 
 ifeq ($(ENABLE_PREFIX_CACHING),true)
 VLLM_BASE_ARGS += --enable-prefix-caching
 endif
 ifeq ($(CALCULATE_KV_SCALES),true)
 VLLM_BASE_ARGS += --calculate-kv-scales
+endif
+ifeq ($(LANGUAGE_MODEL_ONLY),true)
+VLLM_BASE_ARGS += --language-model-only
+endif
+ifneq ($(strip $(REASONING_PARSER)),)
+VLLM_BASE_ARGS += --reasoning-parser "$(REASONING_PARSER)"
 endif
 ifeq ($(ENABLE_AUTO_TOOL_CHOICE),true)
 VLLM_BASE_ARGS += --enable-auto-tool-choice --tool-call-parser "$(TOOL_CALL_PARSER)"
@@ -102,14 +104,14 @@ endif
 
 help:
 	@printf '%s\n' \
-	  'Двухузловой запуск: сначала make start на head, затем make start на worker.' \
+	  'Стартовый профиль: один Linux-хост, одна RTX 2060, Qwen3.5-9B.' \
 	  '' \
 	  'make install          создать .venv и установить зависимости из uv.lock' \
-	  'make start            head: Ray + vLLM background; worker: подключить Ray GPU' \
-	  'make run              head: Ray + vLLM foreground' \
+	  'make start            head: Ray + vLLM в фоне' \
+	  'make run              head: Ray + vLLM в foreground' \
 	  'make stop             остановить локальные процессы сервиса и локальный Ray' \
 	  'make status           проверить локальный узел, Ray-кластер и API' \
-	  'make cluster-status   показать два Ray-узла и их GPU-ресурсы' \
+	  'make cluster-status   показать Ray-узлы и их GPU-ресурсы' \
 	  'make health | models  проверить vLLM API на HOST:PORT' \
 	  'make smoke            выполнить короткий chat-completion запрос' \
 	  'make logs             читать logs/vllm.log на head' \
@@ -128,28 +130,33 @@ install:
 
 check-config:
 	@test "$(NODE_ROLE)" = head || test "$(NODE_ROLE)" = worker || { echo 'NODE_ROLE must be head or worker.' >&2; exit 1; }
-	@test "$(MODEL)" = 'Qwen/Qwen3.6-27B-FP8' || { echo 'MODEL must be Qwen/Qwen3.6-27B-FP8.' >&2; exit 1; }
+	@test "$(MODEL)" = 'Qwen/Qwen3.5-9B' || { echo 'MODEL must be Qwen/Qwen3.5-9B.' >&2; exit 1; }
 	@test -n "$(SERVED_MODEL_NAME)" && test -n "$(HOST)" && test -n "$(BIND_HOST)"
 	@test "$(PORT)" -gt 0 && test "$(PORT)" -le 65535
 	@test "$(RAY_PORT)" -gt 0 && test "$(RAY_PORT)" -le 65535
-	@test "$(RAY_EXPECTED_NODES)" -eq 2 && test "$(RAY_EXPECTED_GPUS)" -eq 2
+	@test "$(RAY_EXPECTED_NODES)" -ge 1 && test "$(RAY_EXPECTED_GPUS)" -ge 1
 	@test "$(CUDA_VISIBLE_DEVICES)" = 0 || { echo 'Each server must expose exactly GPU 0.' >&2; exit 1; }
 	@test "$(TENSOR_PARALLEL_SIZE)" -eq 1 || { echo 'TENSOR_PARALLEL_SIZE must be 1 for one GPU per server.' >&2; exit 1; }
-	@test "$(PIPELINE_PARALLEL_SIZE)" -eq 2 || { echo 'PIPELINE_PARALLEL_SIZE must be 2 for two servers.' >&2; exit 1; }
+	@test "$(PIPELINE_PARALLEL_SIZE)" -ge 1
 	@test "$(DISTRIBUTED_EXECUTOR_BACKEND)" = ray
 	@test $$(( $(TENSOR_PARALLEL_SIZE) * $(PIPELINE_PARALLEL_SIZE) )) -eq "$(RAY_EXPECTED_GPUS)"
 	@test "$(MAX_MODEL_LEN)" -gt 0 && test "$(MAX_NUM_SEQS)" -gt 0
 	@test "$(CPU_OFFLOAD_GB)" -ge 0 && test "$(SWAP_SPACE_GB)" -ge 0
+	@test "$(DTYPE)" = half || { echo 'DTYPE must be half for RTX 2060.' >&2; exit 1; }
+	@test "$(LANGUAGE_MODEL_ONLY)" = true || { echo 'LANGUAGE_MODEL_ONLY must be true for the RTX 2060 profile.' >&2; exit 1; }
 	@awk 'BEGIN { value=$(GPU_MEMORY_UTILIZATION); exit !(value >= 0.50 && value < 1.0) }' || { echo 'GPU_MEMORY_UTILIZATION must be in [0.50, 1.0).' >&2; exit 1; }
 	@if [[ "$(NODE_ROLE)" = head && "$(RAY_NODE_IP)" != "$(RAY_HEAD_IP)" ]]; then echo 'On head, RAY_NODE_IP must equal RAY_HEAD_IP.' >&2; exit 1; fi
 	@if [[ "$(NODE_ROLE)" = worker && "$(RAY_NODE_IP)" = "$(RAY_HEAD_IP)" ]]; then echo 'Worker RAY_NODE_IP must differ from RAY_HEAD_IP.' >&2; exit 1; fi
+	@if [[ "$(NODE_ROLE)" = worker && "$(RAY_EXPECTED_NODES)" -lt 2 ]]; then echo 'Worker requires at least two Ray nodes.' >&2; exit 1; fi
 
 check-cli: check-config
 	@test -x "$(PYTHON)" && test -x "$(VLLM)" && test -x "$(RAY)" || { echo 'Run make install first.' >&2; exit 1; }
 	@vllm_help="$$("$(VLLM)" serve --help 2>&1)"; \
-	flags=(--host --port --served-model-name --tensor-parallel-size --pipeline-parallel-size --distributed-executor-backend --max-model-len --max-num-seqs --gpu-memory-utilization --cpu-offload-gb --swap-space --dtype --kv-cache-dtype --reasoning-parser --limit-mm-per-prompt --allowed-media-domains); \
+	flags=(--host --port --served-model-name --tensor-parallel-size --pipeline-parallel-size --distributed-executor-backend --max-model-len --max-num-seqs --gpu-memory-utilization --cpu-offload-gb --swap-space --dtype --kv-cache-dtype); \
 	[[ "$(ENABLE_PREFIX_CACHING)" != true ]] || flags+=(--enable-prefix-caching); \
 	[[ "$(CALCULATE_KV_SCALES)" != true ]] || flags+=(--calculate-kv-scales); \
+	[[ "$(LANGUAGE_MODEL_ONLY)" != true ]] || flags+=(--language-model-only); \
+	[[ -z "$(REASONING_PARSER)" ]] || flags+=(--reasoning-parser); \
 	[[ "$(ENABLE_AUTO_TOOL_CHOICE)" != true ]] || flags+=(--enable-auto-tool-choice --tool-call-parser); \
 	[[ -z "$${VLLM_API_KEY:-}" ]] || flags+=(--api-key); \
 	for flag in "$${flags[@]}"; do grep -q -- "$$flag" <<<"$$vllm_help" || { echo "Installed vLLM lacks $$flag" >&2; exit 1; }; done
@@ -215,7 +222,7 @@ run: check-cli ray-start
 
 start: check-cli ray-start
 	@if [[ "$(NODE_ROLE)" = worker ]]; then \
-	  echo 'Worker joined Ray and contributes one RTX 5090. vLLM API runs only on head.'; \
+	  echo 'Worker joined Ray and contributes one GPU. vLLM API runs only on head.'; \
 	  "$(MAKE)" --no-print-directory cluster-status || true; \
 	  exit 0; \
 	fi

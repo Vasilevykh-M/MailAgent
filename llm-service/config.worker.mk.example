@@ -1,8 +1,9 @@
-# Worker-server template. Copy as config.mk on the second server.
+# Не используйте этот шаблон в профиле одной RTX 2060. Он оставлен для
+# совместимой двухузловой конфигурации с двумя GPU.
 NODE_ROLE := worker
 
-MODEL := Qwen/Qwen3.6-27B-FP8
-SERVED_MODEL_NAME := qwen3.6-27b-fp8
+MODEL := Qwen/Qwen3.5-9B
+SERVED_MODEL_NAME := qwen3.5-9b
 
 # API still runs on the head server.
 HOST := 192.14.88.2
@@ -31,20 +32,19 @@ TENSOR_PARALLEL_SIZE := 1
 PIPELINE_PARALLEL_SIZE := 2
 DISTRIBUTED_EXECUTOR_BACKEND := ray
 
-MAX_MODEL_LEN := 8192
+MAX_MODEL_LEN := 4096
 MAX_NUM_SEQS := 1
-GPU_MEMORY_UTILIZATION := 0.90
+GPU_MEMORY_UTILIZATION := 0.80
 CPU_OFFLOAD_GB := 0
 SWAP_SPACE_GB := 4
-DTYPE := auto
+DTYPE := half
 KV_CACHE_DTYPE := auto
-ENABLE_PREFIX_CACHING := true
+ENABLE_PREFIX_CACHING := false
 CALCULATE_KV_SCALES := false
-MAX_IMAGES_PER_PROMPT := 1
-REASONING_PARSER := qwen3
-ENABLE_AUTO_TOOL_CHOICE := true
-TOOL_CALL_PARSER := qwen3_coder
-ALLOWED_MEDIA_DOMAIN := invalid.invalid
+LANGUAGE_MODEL_ONLY := true
+REASONING_PARSER :=
+ENABLE_AUTO_TOOL_CHOICE := false
+TOOL_CALL_PARSER :=
 
 HF_HOME := $(CURDIR)/cache/huggingface
 

@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.infrastructure.example
 
 # Виртуальные окружения и кеши Python
 .venv/
