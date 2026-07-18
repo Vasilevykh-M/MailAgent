@@ -33,7 +33,8 @@ results_api:
   max_retries: 3
   verify_tls: true
 dashboard:
-  # Панель намеренно доступна только с локального компьютера.
+  # Для trusted LAN можно указать private/VPN IP сервера, например 192.168.88.32.
+  # Публичные адреса и 0.0.0.0 запрещены.
   host: 127.0.0.1
   port: 8765
   queue_limit: 100

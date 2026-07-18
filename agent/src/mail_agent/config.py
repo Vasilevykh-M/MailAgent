@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Any
 
@@ -109,7 +110,7 @@ class RetrySettings(_Model):
 
 
 class DashboardSettings(_Model):
-    """Локальная read-only панель наблюдения за агентом."""
+    """Read-only панель наблюдения за агентом на loopback или trusted LAN."""
 
     host: str = "127.0.0.1"
     port: PositiveInt = 8765
@@ -118,9 +119,15 @@ class DashboardSettings(_Model):
 
     @field_validator("host")
     @classmethod
-    def local_dashboard_only(cls, value: str) -> str:
-        if value not in {"127.0.0.1", "::1", "localhost"}:
-            raise ValueError("Dashboard host must be a loopback address.")
+    def trusted_dashboard_host(cls, value: str) -> str:
+        if value == "localhost":
+            return value
+        try:
+            address = ip_address(value)
+        except ValueError as exc:
+            raise ValueError("Dashboard host must be localhost or an IP address.") from exc
+        if address.is_unspecified or not (address.is_loopback or address.is_private):
+            raise ValueError("Dashboard host must be a loopback or private/VPN address.")
         return value
 
 

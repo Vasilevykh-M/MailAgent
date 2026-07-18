@@ -4,7 +4,7 @@ API_DIR ?= ./api-service
 LLM_DIR ?= ./llm-service
 OCR_DIR ?= ./ocr-service
 PROFILE ?= core
-UV_CACHE_DIR ?= /private/tmp/mail-agent-uv-cache
+UV_CACHE_DIR ?= /tmp/mail-agent-uv-cache
 
 .DEFAULT_GOAL := help
 .PHONY: help install auth-mail health health-core health-ai run once worker dashboard process retry-failed start stop status test lint typecheck check clean infra-up infra-down infra-status api-migrate api-test api-lint api-typecheck health-data

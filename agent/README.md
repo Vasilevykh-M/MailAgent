@@ -78,4 +78,16 @@ uv run --project agent mail-agent retry-failed
 uv run --project agent mail-agent dashboard
 ```
 
-Панель на `127.0.0.1:8765` показывает `result_committed`, но не тело письма, бинарные данные или ключи. Полный contract и ограничения интеграций приведены в [docs/public-contracts.md](docs/public-contracts.md).
+Панель на `127.0.0.1:8765` показывает `result_committed`, но не тело письма,
+бинарные данные или ключи. Для открытия с другого устройства доверенной LAN
+укажите в `config.yaml` private/VPN IP сервера, например:
+
+```yaml
+dashboard:
+  host: 192.168.88.32
+  port: 8765
+```
+
+Затем запустите `make dashboard` и ограничьте TCP/8765 firewall только нужной
+подсетью. Публичные адреса и `0.0.0.0` намеренно запрещены. Полный contract и
+ограничения интеграций приведены в [docs/public-contracts.md](docs/public-contracts.md).
