@@ -151,7 +151,7 @@ check-config:
 
 check-cli: check-config
 	@test -x "$(PYTHON)" && test -x "$(VLLM)" && test -x "$(RAY)" || { echo 'Run make install first.' >&2; exit 1; }
-	@vllm_help="$$("$(VLLM)" serve --help 2>&1)"; \
+	@if ! vllm_help="$$("$(VLLM)" serve --help=all 2>&1)"; then vllm_help="$$("$(VLLM)" serve --help 2>&1)"; fi; \
 	flags=(--host --port --served-model-name --tensor-parallel-size --pipeline-parallel-size --distributed-executor-backend --max-model-len --max-num-seqs --gpu-memory-utilization --cpu-offload-gb --swap-space --dtype --kv-cache-dtype); \
 	[[ "$(ENABLE_PREFIX_CACHING)" != true ]] || flags+=(--enable-prefix-caching); \
 	[[ "$(CALCULATE_KV_SCALES)" != true ]] || flags+=(--calculate-kv-scales); \
