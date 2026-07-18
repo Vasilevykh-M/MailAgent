@@ -18,6 +18,10 @@ def _month(value: datetime, delta: int) -> datetime:
     return value.replace(year=index // 12, month=index % 12 + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
+def _partition_bound(value: datetime) -> str:
+    return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S+00")
+
+
 async def ensure_partitions(database: Database, months_ahead: int) -> None:
     """Безопасно создаёт именованные по внутренней дате monthly partitions и default fallback."""
 
@@ -34,9 +38,8 @@ async def ensure_partitions(database: Database, months_ahead: int) -> None:
                 await connection.execute(
                     text(
                         f"CREATE TABLE IF NOT EXISTS {base}_{suffix} PARTITION OF {base} "
-                        "FOR VALUES FROM (:start) TO (:end)"
-                    ),
-                    {"start": start, "end": end},
+                        f"FOR VALUES FROM ('{_partition_bound(start)}') TO ('{_partition_bound(end)}')"
+                    )
                 )
 
 
