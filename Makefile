@@ -93,4 +93,4 @@ api-typecheck:
 	@cd "$(API_DIR)" && UV_CACHE_DIR="$(UV_CACHE_DIR)" uv run --extra dev mypy app
 
 health-data:
-	@docker compose exec api-service .venv/bin/python -c "import httpx; response=httpx.get('http://127.0.0.1:8080/health/ready', timeout=5); response.raise_for_status(); print(response.json()['status'])"
+	@docker compose exec api-service .venv/bin/python -c "import json; from urllib.request import urlopen; response=urlopen('http://127.0.0.1:8080/health/ready', timeout=5); print(json.load(response)['status'])"
