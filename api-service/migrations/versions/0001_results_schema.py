@@ -24,9 +24,13 @@ def upgrade() -> None:
           payload_fingerprint varchar(64) NOT NULL,
           created_at timestamptz NOT NULL,
           updated_at timestamptz NOT NULL
-        );
-        CREATE INDEX email_locator_received_at_idx ON email_locator (received_at);
+        )
+        """
+    )
+    op.execute("CREATE INDEX email_locator_received_at_idx ON email_locator (received_at)")
 
+    op.execute(
+        """
         CREATE TABLE emails (
           received_at timestamptz NOT NULL,
           record_id varchar(64) NOT NULL,
@@ -49,10 +53,14 @@ def upgrade() -> None:
           created_at timestamptz NOT NULL,
           updated_at timestamptz NOT NULL,
           PRIMARY KEY (received_at, record_id)
-        ) PARTITION BY RANGE (received_at);
-        CREATE INDEX emails_received_record_desc_idx ON emails (received_at DESC, record_id DESC);
-        CREATE INDEX emails_mailbox_received_idx ON emails (mailbox, received_at DESC, record_id DESC);
+        ) PARTITION BY RANGE (received_at)
+        """
+    )
+    op.execute("CREATE INDEX emails_received_record_desc_idx ON emails (received_at DESC, record_id DESC)")
+    op.execute("CREATE INDEX emails_mailbox_received_idx ON emails (mailbox, received_at DESC, record_id DESC)")
 
+    op.execute(
+        """
         CREATE TABLE email_attachments (
           received_at timestamptz NOT NULL,
           attachment_id uuid NOT NULL,
@@ -75,11 +83,15 @@ def upgrade() -> None:
           updated_at timestamptz NOT NULL,
           PRIMARY KEY (received_at, attachment_id),
           UNIQUE (received_at, record_id, position)
-        ) PARTITION BY RANGE (received_at);
-        CREATE INDEX email_attachments_record_idx ON email_attachments (record_id, received_at, position);
+        ) PARTITION BY RANGE (received_at)
+        """
+    )
+    op.execute("CREATE INDEX email_attachments_record_idx ON email_attachments (record_id, received_at, position)")
 
-        CREATE TABLE emails_default PARTITION OF emails DEFAULT;
-        CREATE TABLE email_attachments_default PARTITION OF email_attachments DEFAULT;
+    op.execute("CREATE TABLE emails_default PARTITION OF emails DEFAULT")
+    op.execute("CREATE TABLE email_attachments_default PARTITION OF email_attachments DEFAULT")
+    op.execute(
+        """
         DO $$
         DECLARE
           month_start timestamptz;
@@ -100,7 +112,7 @@ def upgrade() -> None:
               suffix, month_start, month_end
             );
           END LOOP;
-        END $$;
+        END $$
         """
     )
 
