@@ -97,10 +97,10 @@ def upgrade() -> None:
           month_start timestamptz;
           month_end timestamptz;
           suffix text;
-          offset integer;
+          month_offset integer;
         BEGIN
-          FOR offset IN -1..3 LOOP
-            month_start := date_trunc('month', now()) + make_interval(months => offset);
+          FOR month_offset IN -1..3 LOOP
+            month_start := date_trunc('month', now()) + make_interval(months => month_offset);
             month_end := month_start + interval '1 month';
             suffix := to_char(month_start, 'YYYY_MM');
             EXECUTE format(
