@@ -52,7 +52,6 @@ MAX_MODEL_LEN ?= 4096
 MAX_NUM_SEQS ?= 1
 GPU_MEMORY_UTILIZATION ?= 0.80
 CPU_OFFLOAD_GB ?= 14
-SWAP_SPACE_GB ?= 8
 DTYPE ?= half
 KV_CACHE_DTYPE ?= auto
 ENABLE_PREFIX_CACHING ?= false
@@ -78,7 +77,6 @@ VLLM_BASE_ARGS = serve "$(MODEL)" \
 	--max-num-seqs "$(MAX_NUM_SEQS)" \
 	--gpu-memory-utilization "$(GPU_MEMORY_UTILIZATION)" \
 	--cpu-offload-gb "$(CPU_OFFLOAD_GB)" \
-	--swap-space "$(SWAP_SPACE_GB)" \
 	--dtype "$(DTYPE)" \
 	--kv-cache-dtype "$(KV_CACHE_DTYPE)"
 
@@ -141,7 +139,7 @@ check-config:
 	@test "$(DISTRIBUTED_EXECUTOR_BACKEND)" = ray
 	@test $$(( $(TENSOR_PARALLEL_SIZE) * $(PIPELINE_PARALLEL_SIZE) )) -eq "$(RAY_EXPECTED_GPUS)"
 	@test "$(MAX_MODEL_LEN)" -gt 0 && test "$(MAX_NUM_SEQS)" -gt 0
-	@test "$(CPU_OFFLOAD_GB)" -ge 0 && test "$(SWAP_SPACE_GB)" -ge 0
+	@test "$(CPU_OFFLOAD_GB)" -ge 0
 	@test "$(DTYPE)" = half || { echo 'DTYPE must be half for RTX 2060.' >&2; exit 1; }
 	@test "$(LANGUAGE_MODEL_ONLY)" = true || { echo 'LANGUAGE_MODEL_ONLY must be true for the RTX 2060 profile.' >&2; exit 1; }
 	@awk 'BEGIN { value=$(GPU_MEMORY_UTILIZATION); exit !(value >= 0.50 && value < 1.0) }' || { echo 'GPU_MEMORY_UTILIZATION must be in [0.50, 1.0).' >&2; exit 1; }
@@ -152,7 +150,7 @@ check-config:
 check-cli: check-config
 	@test -x "$(PYTHON)" && test -x "$(VLLM)" && test -x "$(RAY)" || { echo 'Run make install first.' >&2; exit 1; }
 	@if ! vllm_help="$$("$(VLLM)" serve --help=all 2>&1)"; then vllm_help="$$("$(VLLM)" serve --help 2>&1)"; fi; \
-	flags=(--host --port --served-model-name --tensor-parallel-size --pipeline-parallel-size --distributed-executor-backend --max-model-len --max-num-seqs --gpu-memory-utilization --cpu-offload-gb --swap-space --dtype --kv-cache-dtype); \
+	flags=(--host --port --served-model-name --tensor-parallel-size --pipeline-parallel-size --distributed-executor-backend --max-model-len --max-num-seqs --gpu-memory-utilization --cpu-offload-gb --dtype --kv-cache-dtype); \
 	[[ "$(ENABLE_PREFIX_CACHING)" != true ]] || flags+=(--enable-prefix-caching); \
 	[[ "$(CALCULATE_KV_SCALES)" != true ]] || flags+=(--calculate-kv-scales); \
 	[[ "$(LANGUAGE_MODEL_ONLY)" != true ]] || flags+=(--language-model-only); \
