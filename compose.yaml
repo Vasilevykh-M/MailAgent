@@ -85,12 +85,14 @@ services:
         published: "${RESULTS_API_PORT:-8080}"
         host_ip: "${RESULTS_API_HOST:-127.0.0.1}"
         protocol: tcp
-    networks: [data]
+    networks: [data, api]
 
 networks:
   data:
     driver: bridge
     internal: true
+  api:
+    driver: bridge
 
 volumes:
   postgres-data:
