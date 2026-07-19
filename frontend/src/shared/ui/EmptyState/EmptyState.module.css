@@ -1,0 +1,38 @@
+.emptyState {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  padding: var(--space-8);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-strong);
+  text-align: center;
+}
+
+.icon {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(34, 211, 238, 0.28);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, var(--color-accent), transparent 3px),
+    var(--color-accent-muted);
+}
+
+.emptyState h2 {
+  margin: var(--space-4) 0 0;
+  color: var(--color-text);
+  font-size: 1rem;
+}
+
+.emptyState p {
+  max-width: 28rem;
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-subtle);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.action {
+  margin-top: var(--space-5);
+}

@@ -63,3 +63,4 @@ npm run preview
 
 - `api_reference.md` — контракт Results API.
 - `dashboard_plan.md` — план реализации dashboard.
+- `design_system.md` — базовая дизайн-система и UI-принципы.

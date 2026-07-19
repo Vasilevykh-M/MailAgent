@@ -26,6 +26,13 @@
   box-shadow: var(--shadow-panel);
 }
 
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .eyebrow {
   margin: 0;
   color: var(--color-accent-strong);
@@ -83,10 +90,8 @@
 }
 
 .sectionCard {
-  padding: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: rgba(15, 23, 42, 0.62);
+  padding: var(--space-4);
+  box-shadow: none;
 }
 
 .sectionCard p {

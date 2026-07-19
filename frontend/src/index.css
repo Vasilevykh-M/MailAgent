@@ -22,12 +22,33 @@
   --color-border-strong: #334155;
   --color-text: #f8fafc;
   --color-text-muted: #cbd5e1;
+  --color-text-subtle: #94a3b8;
   --color-accent: #22d3ee;
   --color-accent-strong: #67e8f9;
+  --color-accent-muted: rgba(34, 211, 238, 0.12);
+  --color-success: #34d399;
+  --color-success-muted: rgba(52, 211, 153, 0.12);
+  --color-warning: #fbbf24;
+  --color-warning-muted: rgba(251, 191, 36, 0.12);
+  --color-danger: #fb7185;
+  --color-danger-muted: rgba(251, 113, 133, 0.12);
+  --color-info: #60a5fa;
+  --color-info-muted: rgba(96, 165, 250, 0.12);
+  --color-neutral-muted: rgba(148, 163, 184, 0.12);
   --shadow-panel: 0 24px 80px rgba(2, 6, 23, 0.35);
-  --radius-lg: 24px;
+  --shadow-focus: 0 0 0 3px rgba(34, 211, 238, 0.24);
+  --radius-sm: 10px;
   --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
   --container-width: 1280px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
   --space-page-x: 24px;
   --space-page-y: 32px;
 }
@@ -53,4 +74,9 @@ textarea {
 
 a {
   color: inherit;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
 }
