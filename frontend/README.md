@@ -31,11 +31,22 @@ npm run dev
 ```env
 VITE_RESULTS_API_BASE_URL=http://192.168.88.32:8080
 VITE_DEFAULT_MAILBOX=INBOX
+VITE_ENABLE_API_MOCKS=true
 ```
 
 Не храните `READER_API_KEY` в `VITE_*` переменных: такие значения попадают в
 browser bundle. Для защищённого доступа нужен trusted LAN режим, reverse
 proxy/BFF или другой server-side слой авторизации.
+
+## Моки API
+
+В dev режиме подключается `MSW` и имитирует Results API из `api_reference.md`.
+Это позволяет разрабатывать dashboard без включённого backend.
+
+- Моки запускаются только при `import.meta.env.DEV`.
+- В `npm run preview` и production build моки не стартуют.
+- Чтобы отключить моки в dev режиме, задайте `VITE_ENABLE_API_MOCKS=false`.
+- Service worker лежит в `public/mockServiceWorker.js`.
 
 ## Команды
 

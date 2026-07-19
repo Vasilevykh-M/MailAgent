@@ -1,0 +1,284 @@
+export type MockClassification = {
+  status: 'classified' | 'new_project' | 'manual_review'
+  class_code: string | null
+  class_name_ru: string | null
+  reason_ru: string | null
+  confidence: number | null
+  message_ru: string | null
+}
+
+export type MockAttachment = {
+  attachment_id: string
+  id: string
+  position: number
+  original_filename: string
+  safe_filename: string
+  filename: string
+  content_type: string
+  detected_content_type: string
+  size: number
+  sha256: string
+  is_inline: boolean
+  content_id: string | null
+  summary: string | null
+  key_facts: string[]
+  processing_result: Record<string, unknown> | null
+  download_url: string
+  mock_content: string
+}
+
+export type MockEmailDetail = {
+  id: string
+  subject: string
+  from: string
+  content: string
+  summary: string
+  classification: MockClassification | null
+  key_facts: string[]
+  attachment_summaries: string[]
+  warnings: string[]
+  record_id: string
+  received_at: string
+  processed_at: string
+  mailbox: string
+  uid: string
+  message_id: string | null
+  pipeline_version: string
+  processing_generation: number
+  original_email: {
+    subject: string
+    from: string
+    to: string[]
+    cc: string[]
+    bcc: string[]
+    reply_to: string[]
+    headers: Array<{ name: string; value: string }>
+    flags: string[]
+    size_bytes: number
+    text_plain: string
+    text_html: string
+    normalized_body: string
+  }
+  agent_result: Record<string, unknown>
+  attachments: MockAttachment[]
+  raw_download_url: string
+  raw_content: string
+}
+
+const sha256 = '0'.repeat(64)
+
+function buildEmail(seed: {
+  recordId: string
+  uid: string
+  receivedAt: string
+  subject: string
+  sender: string
+  summary: string
+  classification: MockClassification | null
+  confidence: number | null
+  attachments?: Array<{
+    id: string
+    filename: string
+    contentType: string
+    summary: string
+    keyFacts: string[]
+  }>
+  warnings?: string[]
+}): MockEmailDetail {
+  const attachmentSummaries = (seed.attachments ?? []).map(
+    (attachment) => `${attachment.filename}: ${attachment.summary}`,
+  )
+  const content = [
+    `Здравствуйте. ${seed.summary}`,
+    'Просим изучить запрос и подготовить коммерческое предложение.',
+  ].join('\n\n')
+  const processedAt = new Date(
+    new Date(seed.receivedAt).getTime() + 3 * 60 * 1000,
+  ).toISOString()
+
+  return {
+    id: seed.recordId,
+    subject: seed.subject,
+    from: seed.sender,
+    content,
+    summary: seed.summary,
+    classification: seed.classification,
+    key_facts: [
+      'Требуется предварительная оценка стоимости',
+      'Ожидается обратная связь в течение недели',
+    ],
+    attachment_summaries: attachmentSummaries,
+    warnings: seed.warnings ?? [],
+    record_id: seed.recordId,
+    received_at: seed.receivedAt,
+    processed_at: processedAt,
+    mailbox: 'INBOX',
+    uid: seed.uid,
+    message_id: `<${seed.uid}@example.test>`,
+    pipeline_version: '2',
+    processing_generation: 0,
+    original_email: {
+      subject: seed.subject,
+      from: seed.sender,
+      to: ['sales@example.test'],
+      cc: [],
+      bcc: [],
+      reply_to: [],
+      headers: [
+        { name: 'Message-ID', value: `<${seed.uid}@example.test>` },
+        { name: 'X-Mailbox', value: 'INBOX' },
+      ],
+      flags: [],
+      size_bytes: 4096,
+      text_plain: content,
+      text_html: `<p>${content.replaceAll('\n\n', '</p><p>')}</p>`,
+      normalized_body: content,
+    },
+    agent_result: {
+      summary: {
+        summary_ru: seed.summary,
+        classification: seed.classification,
+        key_facts_ru: [
+          'Требуется предварительная оценка стоимости',
+          'Ожидается обратная связь в течение недели',
+        ],
+        attachment_summaries: attachmentSummaries,
+        warnings_ru: seed.warnings ?? [],
+        confidence: seed.confidence,
+      },
+      attachment_count: seed.attachments?.length ?? 0,
+      warnings: [],
+    },
+    attachments: (seed.attachments ?? []).map((attachment, index) => ({
+      attachment_id: attachment.id,
+      id: attachment.id,
+      position: index,
+      original_filename: attachment.filename,
+      safe_filename: attachment.filename,
+      filename: attachment.filename,
+      content_type: attachment.contentType,
+      detected_content_type: attachment.contentType,
+      size: 18_432 + index * 2048,
+      sha256,
+      is_inline: false,
+      content_id: null,
+      summary: attachment.summary,
+      key_facts: attachment.keyFacts,
+      processing_result: {
+        summary_ru: attachment.summary,
+        key_facts_ru: attachment.keyFacts,
+      },
+      download_url: `/api/v1/emails/${seed.recordId}/attachments/${attachment.id}/content`,
+      mock_content: `Mock file: ${attachment.filename}\n${attachment.summary}\n`,
+    })),
+    raw_download_url: `/api/v1/emails/${seed.recordId}/raw`,
+    raw_content: [
+      `From: ${seed.sender}`,
+      'To: sales@example.test',
+      `Subject: ${seed.subject}`,
+      `Message-ID: <${seed.uid}@example.test>`,
+      '',
+      content,
+    ].join('\r\n'),
+  }
+}
+
+export const mockEmails = [
+  buildEmail({
+    recordId: 'a'.repeat(64),
+    uid: '1001',
+    receivedAt: '2026-07-17T10:00:00.000Z',
+    subject: 'Запрос КП на токарный станок',
+    sender: 'ivan.petrov@example.test',
+    summary: 'Клиент просит рассчитать поставку токарного станка с ЧПУ.',
+    confidence: 0.91,
+    classification: {
+      status: 'classified',
+      class_code: 'MACHINES',
+      class_name_ru: 'Станки',
+      reason_ru: 'В письме явно указан токарный станок с ЧПУ.',
+      confidence: 0.91,
+      message_ru: 'Запрос относится к направлению станков.',
+    },
+    attachments: [
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        filename: 'technical_requirements.pdf',
+        contentType: 'application/pdf',
+        summary: 'Техническое задание на станок с параметрами обработки.',
+        keyFacts: ['Указан диаметр обработки', 'Нужна система ЧПУ'],
+      },
+    ],
+  }),
+  buildEmail({
+    recordId: 'b'.repeat(64),
+    uid: '1002',
+    receivedAt: '2026-07-16T14:30:00.000Z',
+    subject: 'Автоматизация участка упаковки',
+    sender: 'robotics@example.test',
+    summary: 'Запрос на роботизированную ячейку для укладки продукции.',
+    confidence: 0.84,
+    classification: {
+      status: 'classified',
+      class_code: 'ROBOTIC_CELLS',
+      class_name_ru: 'Роботизированные ячейки',
+      reason_ru: 'Описана роботизированная укладка продукции.',
+      confidence: 0.84,
+      message_ru: 'Запрос относится к роботизированным ячейкам.',
+    },
+    attachments: [
+      {
+        id: '22222222-2222-4222-8222-222222222222',
+        filename: 'layout.xlsx',
+        contentType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        summary: 'План участка и производительность линии.',
+        keyFacts: ['Нужно 12 циклов в минуту', 'Есть ограничения по площади'],
+      },
+    ],
+  }),
+  buildEmail({
+    recordId: 'c'.repeat(64),
+    uid: '1003',
+    receivedAt: '2026-07-15T08:20:00.000Z',
+    subject: 'Новая идея проекта',
+    sender: 'new.project@example.test',
+    summary: 'Письмо не относится к текущим направлениям оборудования.',
+    confidence: 0.67,
+    classification: {
+      status: 'new_project',
+      class_code: null,
+      class_name_ru: null,
+      reason_ru: 'Нет явной связи с поддерживаемыми классами оборудования.',
+      confidence: 0.67,
+      message_ru: 'Это новый проект',
+    },
+  }),
+  buildEmail({
+    recordId: 'd'.repeat(64),
+    uid: '1004',
+    receivedAt: '2026-07-14T16:05:00.000Z',
+    subject: 'Нечитаемое вложение с запросом',
+    sender: 'review@example.test',
+    summary: 'Часть данных недоступна из-за проблем с вложением.',
+    confidence: null,
+    classification: {
+      status: 'manual_review',
+      class_code: null,
+      class_name_ru: null,
+      reason_ru: 'Важное вложение не удалось обработать надёжно.',
+      confidence: null,
+      message_ru: 'Требуется ручная проверка',
+    },
+    warnings: ['Вложение требует ручной проверки'],
+    attachments: [
+      {
+        id: '44444444-4444-4444-8444-444444444444',
+        filename: 'scan.zip',
+        contentType: 'application/zip',
+        summary: 'Архив не был обработан автоматически.',
+        keyFacts: ['Нужно открыть вручную'],
+      },
+    ],
+  }),
+]

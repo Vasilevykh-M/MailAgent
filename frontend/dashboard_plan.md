@@ -41,15 +41,15 @@ React + TypeScript.
 
 Рекомендуемый вариант для MVP:
 
-- `Tailwind CSS` — быстрый, предсказуемый layout без тяжёлого UI framework.
+- `CSS Modules` — локальные стили компонентов без utility framework.
+- Глобальный CSS-файл — переменные цвета, spacing, radii и базовый reset.
 - `lucide-react` — иконки.
 - Небольшой набор собственных компонентов: `Button`, `Input`, `Select`, `Badge`,
   `Card`, `Table`, `Spinner`, `Alert`, `EmptyState`.
 
 Причина: dashboard простой, а внешний UI-kit может добавить больше сложности,
-чем пользы. Если позже потребуется ускорить визуальную полировку, можно добавить
-`shadcn/ui`, но для первого этапа достаточно собственных компонентов на
-Tailwind.
+чем пользы. CSS Modules дают явные границы стилей и не требуют дополнительного
+runtime.
 
 ### Графики
 
@@ -60,9 +60,11 @@ Tailwind.
 ### Качество
 
 - `ESLint` — статическая проверка TypeScript/React.
-- `Prettier` — форматирование.
+- `Oxlint` — статическая проверка TypeScript/React.
+- `Oxfmt` — форматирование с шириной строки `80`.
 - `Vitest` — unit-тесты утилит, API client и mapper’ов.
 - `React Testing Library` — тесты ключевых UI-состояний.
+- `MSW` — dev-only моки Results API для разработки без backend.
 
 ## Безопасность и доступ к API
 
@@ -519,8 +521,9 @@ Client-side для уже загруженных данных:
 
 - Создать Vite React + TypeScript проект внутри `frontend/`.
 - Настроить `package.json`, `tsconfig`, `vite.config.ts`.
-- Добавить ESLint, Prettier.
-- Добавить Tailwind CSS.
+- Добавить Oxlint, Oxfmt.
+- Добавить CSS Modules и глобальные CSS-переменные.
+- Добавить MSW для dev-only моков API.
 - Добавить базовый layout приложения.
 
 ### Этап 2. API слой
