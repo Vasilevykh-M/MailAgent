@@ -101,6 +101,33 @@
   scroll-margin-top: var(--space-6);
 }
 
+@media (max-width: 640px) {
+  .container {
+    gap: var(--space-4);
+  }
+
+  .hero {
+    padding: var(--space-4);
+  }
+
+  .headerRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .statusGroup {
+    justify-content: flex-start;
+  }
+
+  .title {
+    font-size: 1.75rem;
+  }
+
+  .configCard {
+    width: 100%;
+  }
+}
+
 @media (min-width: 1024px) {
   .heroContent {
     flex-direction: row;
@@ -110,5 +137,10 @@
 
   .contentGrid {
     grid-template-columns: minmax(0, 1.12fr) minmax(360px, 0.88fr);
+  }
+
+  .detailPanelAnchor {
+    position: sticky;
+    top: var(--space-6);
   }
 }

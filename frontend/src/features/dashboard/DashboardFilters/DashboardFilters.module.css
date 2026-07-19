@@ -54,6 +54,7 @@
 }
 
 .searchBox input {
+  min-width: 0;
   min-height: auto;
   padding-block: 0;
   padding-inline: var(--control-padding-inline);

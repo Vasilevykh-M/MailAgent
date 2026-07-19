@@ -47,3 +47,17 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+@media (max-width: 640px) {
+  .card {
+    padding: var(--space-4);
+  }
+
+  .header {
+    flex-direction: column;
+  }
+
+  .actions {
+    width: 100%;
+  }
+}

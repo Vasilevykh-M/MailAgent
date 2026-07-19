@@ -48,6 +48,31 @@ proxy/BFF или другой server-side слой авторизации.
 - Чтобы отключить моки в dev режиме, задайте `VITE_ENABLE_API_MOCKS=false`.
 - Service worker лежит в `public/mockServiceWorker.js`.
 
+## Что уже работает
+
+- Проверка готовности API через `/health/ready`.
+- Фильтрация периода и `mailbox` через query параметры API.
+- Локальный поиск по загруженным страницам списка.
+- Локальные фильтры по вложениям, confidence и кешированному статусу detail.
+- KPI по `/api/v1/statistics`.
+- Графики по статусам и классам через `Recharts`.
+- Список писем с автоматической догрузкой следующих страниц.
+- Выбор письма через route `/emails/:recordId`.
+- Detail panel: summary, classification, key facts, warnings, content,
+  attachment summaries, attachments и technical JSON.
+- Скачивание вложений и исходного `.eml` через API download endpoints.
+
+## Ограничения
+
+- API не поддерживает server-side поиск по теме, отправителю или тексту.
+- API не поддерживает server-side фильтры по `class_code`, `status`,
+  `has_attachments`, `confidence`.
+- API не отдаёт список mailbox, поэтому `mailbox` вводится вручную.
+- Фильтр по статусу в UI работает только для писем, detail которых уже есть в
+  TanStack Query cache.
+- `Recharts` увеличивает production chunk; при необходимости графики можно
+  вынести в lazy chunk.
+
 ## Команды
 
 ```bash
