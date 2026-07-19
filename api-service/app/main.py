@@ -12,6 +12,7 @@ from typing import Annotated, Any
 from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Header, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.datastructures import UploadFile
 
@@ -107,6 +108,15 @@ def create_app(
                 await database.close()
 
     app = FastAPI(title="Mail Agent Results API", version="1", docs_url=None, redoc_url=None, lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=selected.cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET"],
+        allow_headers=["Authorization", "X-API-Key"],
+        expose_headers=["Content-Disposition", "Content-Length", "X-Request-ID"],
+        max_age=600,
+    )
     app.state.settings = selected
     app.state.repository = result_repository
     app.state.storage = object_storage

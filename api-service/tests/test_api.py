@@ -209,8 +209,15 @@ def payload_for(attachment: bytes = b"document") -> dict[str, object]:
     }
 
 
-def client(*, allow_anonymous_reader: bool = False) -> tuple[TestClient, MemoryRepository, MemoryStorage]:
-    settings = Settings(writer_api_key="writer", reader_api_key="reader", allow_anonymous_reader=allow_anonymous_reader)
+def client(
+    *, allow_anonymous_reader: bool = False, cors_allowed_origins: str = ""
+) -> tuple[TestClient, MemoryRepository, MemoryStorage]:
+    settings = Settings(
+        writer_api_key="writer",
+        reader_api_key="reader",
+        allow_anonymous_reader=allow_anonymous_reader,
+        cors_allowed_origins=cors_allowed_origins,
+    )
     repository, storage = MemoryRepository(), MemoryStorage()
     return TestClient(create_app(settings, repository=repository, storage=storage)), repository, storage
 
@@ -267,6 +274,34 @@ def test_anonymous_reader_does_not_allow_anonymous_writer() -> None:
     assert reader_response.status_code == 200
     writer_response = test_client.put(f"/api/v1/internal/emails/{RECORD_ID}", files=files(payload_for()))
     assert writer_response.status_code == 401
+
+
+def test_cors_allows_only_configured_preview_origin() -> None:
+    test_client, _repository, _storage = client(cors_allowed_origins="http://localhost:4173")
+
+    preflight = test_client.options(
+        "/api/v1/statistics",
+        headers={
+            "Origin": "http://localhost:4173",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "X-API-Key",
+        },
+    )
+    denied = test_client.get("/health/live", headers={"Origin": "http://localhost:5173"})
+
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == "http://localhost:4173"
+    assert "X-API-Key" in preflight.headers["access-control-allow-headers"]
+    assert "access-control-allow-origin" not in denied.headers
+
+
+def test_cors_allows_every_origin_when_explicitly_enabled() -> None:
+    test_client, _repository, _storage = client(cors_allowed_origins="*")
+
+    response = test_client.get("/health/live", headers={"Origin": "https://preview.example.test"})
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "*"
 
 
 def test_reader_statistics_for_period() -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 from pydantic import AnyHttpUrl, Field, PositiveInt, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,6 +24,7 @@ class Settings(BaseSettings):
     writer_api_key: SecretStr = SecretStr("")
     reader_api_key: SecretStr = SecretStr("")
     allow_anonymous_reader: bool = False
+    cors_allowed_origins: str = ""
     max_message_bytes: PositiveInt = 25 * 1024 * 1024
     max_attachment_bytes: PositiveInt = 25 * 1024 * 1024
     max_attachments_per_message: PositiveInt = 30
@@ -45,6 +47,28 @@ class Settings(BaseSettings):
         if value not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
             raise ValueError("LOG_LEVEL must be DEBUG, INFO, WARNING or ERROR")
         return value
+
+    @field_validator("cors_allowed_origins")
+    @classmethod
+    def valid_cors_allowed_origins(cls, value: str) -> str:
+        if value.strip() == "*":
+            return "*"
+        origins: list[str] = []
+        for raw_origin in value.split(","):
+            origin = raw_origin.strip().rstrip("/")
+            if not origin:
+                continue
+            if origin == "*":
+                raise ValueError("CORS_ALLOWED_ORIGINS=* cannot be combined with explicit origins")
+            parsed = urlsplit(origin)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.path or parsed.query:
+                raise ValueError("CORS_ALLOWED_ORIGINS must contain comma-separated HTTP origins")
+            origins.append(origin)
+        return ",".join(dict.fromkeys(origins))
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return self.cors_allowed_origins.split(",") if self.cors_allowed_origins else []
 
 
 @lru_cache

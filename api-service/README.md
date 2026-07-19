@@ -10,7 +10,8 @@
 cp .env.infrastructure.example .env
 # Заполните POSTGRES_PASSWORD, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD,
 # WRITER_API_KEY и READER_API_KEY. Для read-only API без ключа в доверенной
-# сети задайте ALLOW_ANONYMOUS_READER=true.
+# сети задайте ALLOW_ANONYMOUS_READER=true. Для frontend preview добавьте
+# CORS_ALLOWED_ORIGINS=http://localhost:4173.
 make infra-up
 make health-data
 ```

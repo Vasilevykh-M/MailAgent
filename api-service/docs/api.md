@@ -24,6 +24,13 @@ curl -X PUT "http://127.0.0.1:8080/api/v1/internal/emails/$RECORD_ID" \
 писем и вложения каждому, кто может подключиться к API; включайте режим только в
 доверенной сети. Write endpoint всегда требует `WRITER_API_KEY`.
 
+Для браузерного frontend задайте `CORS_ALLOWED_ORIGINS` в корневом `.env`,
+например `http://localhost:4173` или несколько origin через запятую. API отвечает
+на CORS только для перечисленных origin, разрешает read-only `GET` и отдаёт
+`Content-Disposition` для скачиваемых вложений. Явное значение `*` открывает
+CORS для любых origin; используйте его только осознанно, особенно вместе с
+`ALLOW_ANONYMOUS_READER=true`.
+
 - `GET /api/v1/emails?limit=50&cursor=...&from=...&to=...&mailbox=INBOX` — лёгкий список с opaque keyset cursor. Каждый элемент содержит `id` (он же `record_id`), `subject`, `from`, `received_at`, preview, количество вложений и confidence. Максимум `100`.
 - `GET /api/v1/emails/{record_id}` — полная карточка письма. Верхнеуровневые поля `id`, `subject`, `from`, `received_at`, `content`, `summary`, `classification`, `key_facts`, `attachment_summaries` и `warnings` предназначены для интерфейса. `content` — нормализованный plain-text тела письма; исходные текстовая и HTML-версии остаются в `original_email`.
 - В `attachments` каждый файл содержит `id`, `filename`, `summary`, `key_facts` и `download_url`. `download_url` ведёт на потоковую загрузку файла через API; MinIO URL не выдаётся.
