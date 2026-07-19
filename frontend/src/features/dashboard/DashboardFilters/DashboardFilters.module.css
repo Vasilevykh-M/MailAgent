@@ -33,6 +33,11 @@
   width: 100%;
 }
 
+.field select {
+  appearance: none;
+  padding-right: calc(var(--control-padding-inline) + 28px);
+}
+
 .field input::placeholder {
   color: var(--color-text-subtle);
 }
@@ -62,18 +67,52 @@
   background: transparent;
 }
 
+.selectBox {
+  position: relative;
+}
+
+.selectBox svg {
+  position: absolute;
+  top: 50%;
+  right: var(--control-padding-inline);
+  pointer-events: none;
+  color: var(--color-text-subtle);
+  transform: translateY(-50%);
+}
+
 @media (min-width: 900px) {
   .grid {
     align-items: end;
-    grid-template-columns: 150px 150px 150px minmax(220px, 1fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .field {
+    grid-column: span 2;
+  }
+
+  .searchField {
+    grid-column: span 6;
+  }
+
+  .selectField {
+    grid-column: span 2;
   }
 }
 
 @media (min-width: 1180px) {
   .grid {
-    grid-template-columns: 140px 140px 140px minmax(
-        220px,
-        1fr
-      ) 150px 150px 170px;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .field {
+    grid-column: span 2;
+  }
+
+  .searchField {
+    grid-column: span 6;
+  }
+
+  .selectField {
+    grid-column: span 4;
   }
 }

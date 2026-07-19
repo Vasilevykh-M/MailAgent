@@ -124,20 +124,22 @@ export function EmailDetailPanel({
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
             <h3>Классификация</h3>
-            <Badge
-              tone={getClassificationStatusTone(data.classification?.status)}
-            >
-              {getClassificationStatusLabel(data.classification?.status)}
-            </Badge>
           </div>
           <div className={styles.classificationGrid}>
-            <Metric label="Класс">
+            <Metric className={styles.classificationMetric} label="Статус">
+              <Badge
+                tone={getClassificationStatusTone(data.classification?.status)}
+              >
+                {getClassificationStatusLabel(data.classification?.status)}
+              </Badge>
+            </Metric>
+            <Metric className={styles.classificationMetric} label="Класс">
               {formatNullable(data.classification?.class_name_ru)}
             </Metric>
-            <Metric label="Код">
+            <Metric className={styles.classificationMetric} label="Код">
               {formatNullable(data.classification?.class_code)}
             </Metric>
-            <Metric label="Уверенность">
+            <Metric className={styles.classificationMetric} label="Уверенность">
               <Badge tone={getConfidenceTone(data.classification?.confidence)}>
                 {formatConfidence(data.classification?.confidence)}
               </Badge>
@@ -258,13 +260,14 @@ export function EmailDetailPanel({
 }
 
 type MetricProps = {
+  className?: string
   label: string
   children: React.ReactNode
 }
 
-function Metric({ label, children }: MetricProps) {
+function Metric({ className = '', label, children }: MetricProps) {
   return (
-    <div className={styles.metric}>
+    <div className={`${styles.metric} ${className}`}>
       <dt>{label}</dt>
       <dd>{children}</dd>
     </div>

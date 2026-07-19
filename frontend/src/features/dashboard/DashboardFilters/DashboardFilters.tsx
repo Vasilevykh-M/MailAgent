@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react'
+import { ChevronDown, Search } from 'lucide-react'
 
 import { Card } from '../../../shared'
 
@@ -71,60 +71,69 @@ export function DashboardFilters({ value, onChange }: DashboardFiltersProps) {
             />
           </div>
         </label>
-        <label className={styles.field}>
+        <label className={`${styles.field} ${styles.selectField}`}>
           <span>Вложения</span>
-          <select
-            onChange={(event) =>
-              onChange({
-                ...value,
-                attachmentFilter: event.target
-                  .value as DashboardFiltersValue['attachmentFilter'],
-              })
-            }
-            value={value.attachmentFilter}
-          >
-            <option value="all">Все</option>
-            <option value="with">С вложениями</option>
-            <option value="without">Без вложений</option>
-          </select>
+          <div className={styles.selectBox}>
+            <select
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  attachmentFilter: event.target
+                    .value as DashboardFiltersValue['attachmentFilter'],
+                })
+              }
+              value={value.attachmentFilter}
+            >
+              <option value="all">Все</option>
+              <option value="with">С вложениями</option>
+              <option value="without">Без вложений</option>
+            </select>
+            <ChevronDown aria-hidden="true" size={16} />
+          </div>
         </label>
-        <label className={styles.field}>
+        <label className={`${styles.field} ${styles.selectField}`}>
           <span>Уверенность</span>
-          <select
-            onChange={(event) =>
-              onChange({
-                ...value,
-                confidenceFilter: event.target
-                  .value as DashboardFiltersValue['confidenceFilter'],
-              })
-            }
-            value={value.confidenceFilter}
-          >
-            <option value="all">Любая</option>
-            <option value="high">Высокая</option>
-            <option value="medium">Средняя</option>
-            <option value="low">Низкая</option>
-            <option value="none">Нет оценки</option>
-          </select>
+          <div className={styles.selectBox}>
+            <select
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  confidenceFilter: event.target
+                    .value as DashboardFiltersValue['confidenceFilter'],
+                })
+              }
+              value={value.confidenceFilter}
+            >
+              <option value="all">Любая</option>
+              <option value="high">Высокая</option>
+              <option value="medium">Средняя</option>
+              <option value="low">Низкая</option>
+              <option value="none">Нет оценки</option>
+            </select>
+            <ChevronDown aria-hidden="true" size={16} />
+          </div>
         </label>
-        <label className={styles.field}>
+        <label className={`${styles.field} ${styles.selectField}`}>
           <span>Статус</span>
-          <select
-            onChange={(event) =>
-              onChange({
-                ...value,
-                statusFilter: event.target
-                  .value as DashboardFiltersValue['statusFilter'],
-              })
-            }
-            value={value.statusFilter}
-          >
-            <option value="all">Все</option>
-            <option value="classified">Классифицировано</option>
-            <option value="new_project">Новый проект</option>
-            <option value="manual_review">Ручная проверка</option>
-            <option value="uncached">Без данных статуса</option>
-          </select>
+          <div className={styles.selectBox}>
+            <select
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  statusFilter: event.target
+                    .value as DashboardFiltersValue['statusFilter'],
+                })
+              }
+              value={value.statusFilter}
+            >
+              <option value="all">Все</option>
+              <option value="classified">Классифицировано</option>
+              <option value="new_project">Новый проект</option>
+              <option value="manual_review">Ручная проверка</option>
+              <option value="uncached">Без данных статуса</option>
+            </select>
+            <ChevronDown aria-hidden="true" size={16} />
+          </div>
         </label>
       </div>
     </Card>

@@ -31,13 +31,20 @@
 
 .classificationGrid {
   display: grid;
-  margin-top: var(--space-4);
-  gap: var(--space-3);
+  margin-top: var(--space-3);
+  gap: var(--space-2);
   grid-template-columns: 1fr;
 }
 
 .metric {
   min-width: 0;
+}
+
+.classificationMetric {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
 }
 
 .metric dt {
@@ -49,7 +56,18 @@
 .metric dd {
   margin: var(--space-1) 0 0;
   color: var(--color-text);
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.classificationMetric dd {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.classificationMetric dd > * {
+  min-width: 0;
 }
 
 .reason,
@@ -150,7 +168,7 @@
 
 @media (min-width: 720px) {
   .classificationGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
