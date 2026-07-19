@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import {
@@ -57,6 +57,7 @@ function matchesSearch(item: EmailListItem, search: string) {
 export function DashboardPage() {
   const navigate = useNavigate()
   const { recordId = null } = useParams()
+  const detailPanelRef = useRef<HTMLDivElement | null>(null)
   const [filters, setFilters] = useState(defaultFilters)
   const apiParams = useMemo(
     () => ({
@@ -101,6 +102,19 @@ export function DashboardPage() {
   const loadMoreEmails = useCallback(() => {
     void fetchNextPage()
   }, [fetchNextPage])
+
+  useEffect(() => {
+    if (!recordId) {
+      return
+    }
+
+    window.requestAnimationFrame(() => {
+      detailPanelRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+  }, [recordId])
 
   return (
     <main className={styles.page}>
@@ -163,12 +177,14 @@ export function DashboardPage() {
             onSelect={selectEmail}
             selectedId={recordId}
           />
-          <EmailDetailPanel
-            data={emailDetail.data}
-            isError={emailDetail.isError}
-            isLoading={emailDetail.isLoading}
-            isPlaceholder={!recordId}
-          />
+          <div className={styles.detailPanelAnchor} ref={detailPanelRef}>
+            <EmailDetailPanel
+              data={emailDetail.data}
+              isError={emailDetail.isError}
+              isLoading={emailDetail.isLoading}
+              isPlaceholder={!recordId}
+            />
+          </div>
         </div>
       </div>
     </main>
