@@ -21,7 +21,8 @@
   font-weight: 650;
 }
 
-.field input {
+.field input,
+.field select {
   min-height: 40px;
   padding-block: 0;
   padding-inline: var(--control-padding-inline);
@@ -63,6 +64,15 @@
 @media (min-width: 900px) {
   .grid {
     align-items: end;
-    grid-template-columns: 150px 150px 150px minmax(220px, 1fr) auto;
+    grid-template-columns: 150px 150px 150px minmax(220px, 1fr);
+  }
+}
+
+@media (min-width: 1180px) {
+  .grid {
+    grid-template-columns: 140px 140px 140px minmax(
+        220px,
+        1fr
+      ) 150px 150px 170px;
   }
 }
