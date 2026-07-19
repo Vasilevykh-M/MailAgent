@@ -1,0 +1,54 @@
+.grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: 1fr;
+}
+
+.metric {
+  padding: var(--space-5);
+  box-shadow: none;
+}
+
+.label {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.value {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text);
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 750;
+  letter-spacing: -0.04em;
+}
+
+.skeletonTitle,
+.skeletonValue {
+  border-radius: 999px;
+  background: var(--color-neutral-muted);
+}
+
+.skeletonTitle {
+  width: 96px;
+  height: 12px;
+}
+
+.skeletonValue {
+  width: 140px;
+  height: 28px;
+  margin-top: var(--space-3);
+}
+
+@media (min-width: 720px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1120px) {
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
