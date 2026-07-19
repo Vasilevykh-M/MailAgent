@@ -1,0 +1,1 @@
+export { EmailDetailPanel } from './EmailDetailPanel'

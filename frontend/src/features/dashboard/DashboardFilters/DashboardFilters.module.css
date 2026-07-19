@@ -1,0 +1,79 @@
+.card {
+  padding: var(--space-4);
+  box-shadow: none;
+}
+
+.grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1fr;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field span {
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.field input,
+.field select {
+  min-height: 40px;
+  padding-block: 0;
+  padding-inline: var(--control-padding-inline);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-strong);
+  color: var(--color-text);
+  width: 100%;
+}
+
+.field input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.searchBox {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-strong);
+  color: var(--color-text);
+}
+
+.searchBox svg {
+  margin-left: var(--control-padding-inline);
+  flex-shrink: 0;
+}
+
+.searchBox input {
+  min-width: 0;
+  min-height: auto;
+  padding-block: 0;
+  padding-inline: var(--control-padding-inline);
+  border: 0;
+  background: transparent;
+}
+
+@media (min-width: 900px) {
+  .grid {
+    align-items: end;
+    grid-template-columns: 150px 150px 150px minmax(220px, 1fr);
+  }
+}
+
+@media (min-width: 1180px) {
+  .grid {
+    grid-template-columns: 140px 140px 140px minmax(
+        220px,
+        1fr
+      ) 150px 150px 170px;
+  }
+}
