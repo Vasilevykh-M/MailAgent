@@ -71,3 +71,15 @@
   border-radius: var(--radius-md);
   background: var(--color-neutral-muted);
 }
+
+.sentinel {
+  height: 1px;
+}
+
+.autoLoadStatus {
+  margin: var(--space-4) 0 0;
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  text-align: center;
+}

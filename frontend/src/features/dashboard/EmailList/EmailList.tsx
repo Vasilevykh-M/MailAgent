@@ -1,12 +1,17 @@
+import { useEffect, useRef } from 'react'
+
 import type { EmailListItem } from '../../../api'
 import { Badge, Button, Card, EmptyState } from '../../../shared'
 import {
   formatConfidence,
   formatDateTime,
   getConfidenceTone,
+  useIntersectionObserver,
 } from '../../../shared'
 
 import styles from './EmailList.module.css'
+
+const autoLoadThrottleMs = 1000
 
 type EmailListProps = {
   items: EmailListItem[]
@@ -14,6 +19,7 @@ type EmailListProps = {
   isLoading: boolean
   isError: boolean
   isFetchingNextPage: boolean
+  nextCursor: string | null
   selectedId: string | null
   onLoadMore: () => void
   onSelect: (recordId: string) => void
@@ -25,10 +31,33 @@ export function EmailList({
   isLoading,
   isError,
   isFetchingNextPage,
+  nextCursor,
   selectedId,
   onLoadMore,
   onSelect,
 }: EmailListProps) {
+  const { isIntersecting, targetRef } =
+    useIntersectionObserver<HTMLDivElement>()
+  const lastAutoLoadedCursorRef = useRef<string | null>(null)
+  const lastAutoLoadAtRef = useRef(0)
+
+  useEffect(() => {
+    const now = Date.now()
+
+    if (
+      isIntersecting &&
+      hasNextPage &&
+      !isFetchingNextPage &&
+      nextCursor &&
+      lastAutoLoadedCursorRef.current !== nextCursor &&
+      now - lastAutoLoadAtRef.current >= autoLoadThrottleMs
+    ) {
+      lastAutoLoadedCursorRef.current = nextCursor
+      lastAutoLoadAtRef.current = now
+      onLoadMore()
+    }
+  }, [hasNextPage, isFetchingNextPage, isIntersecting, nextCursor, onLoadMore])
+
   if (isLoading) {
     return (
       <Card title="Письма" variant="muted">
@@ -99,7 +128,15 @@ export function EmailList({
             </div>
           </button>
         ))}
+        <div aria-hidden="true" className={styles.sentinel} ref={targetRef} />
       </div>
+      {hasNextPage && (
+        <p className={styles.autoLoadStatus}>
+          {isFetchingNextPage
+            ? 'Загружаем следующую страницу…'
+            : 'Следующая страница загрузится автоматически внизу списка.'}
+        </p>
+      )}
     </Card>
   )
 }

@@ -67,6 +67,52 @@ export type MockEmailDetail = {
 
 const sha256 = '0'.repeat(64)
 
+const classifiedTemplates = [
+  {
+    classCode: '3D_PRINTERS',
+    className: '3D-принтеры',
+    subject: 'Подбор промышленного 3D-принтера',
+    summary: 'Клиент просит подобрать промышленный 3D-принтер для прототипов.',
+  },
+  {
+    classCode: 'CHEMISTRY',
+    className: 'Химия',
+    subject: 'Линия дозирования химических компонентов',
+    summary: 'Запрос на оборудование для дозирования и смешивания реагентов.',
+  },
+  {
+    classCode: 'FOUNDRY',
+    className: 'Литейное производство',
+    subject: 'Оснастка для литейного участка',
+    summary: 'Нужно оценить комплект оборудования для литейного производства.',
+  },
+  {
+    classCode: 'MOLD_PRINTING',
+    className: 'Печать форм',
+    subject: 'Печать форм для мелкосерийного производства',
+    summary: 'Клиент интересуется печатью форм и сроками запуска участка.',
+  },
+  {
+    classCode: 'PRODUCTION_LINES',
+    className: 'Производственные линии',
+    subject: 'Комплектация производственной линии',
+    summary: 'Запрос на предварительную комплектацию производственной линии.',
+  },
+  {
+    classCode: 'TECHNICAL_VISION',
+    className: 'Техническое зрение',
+    subject: 'Система технического зрения для контроля',
+    summary: 'Нужна система технического зрения для контроля качества изделий.',
+  },
+  {
+    classCode: 'OTHER_EQUIPMENT',
+    className: 'Другое оборудование',
+    subject: 'Подбор промышленного оборудования',
+    summary:
+      'Запрос относится к промышленному оборудованию вне основных классов.',
+  },
+]
+
 function buildEmail(seed: {
   recordId: string
   uid: string
@@ -280,5 +326,68 @@ export const mockEmails = [
         keyFacts: ['Нужно открыть вручную'],
       },
     ],
+  }),
+  ...Array.from({ length: 32 }, (_, index) => {
+    const template = classifiedTemplates[index % classifiedTemplates.length]
+    const day = 13 - Math.floor(index / 3)
+    const hour = 17 - (index % 8)
+    const confidence = Math.max(0.42, 0.92 - (index % 10) * 0.05)
+    const isManualReview = index % 11 === 5
+    const isNewProject = index % 13 === 7
+    const hasAttachment = index % 3 !== 1
+    const recordId = (index + 5).toString(16).padStart(64, '0').slice(-64)
+
+    return buildEmail({
+      recordId,
+      uid: String(1100 + index),
+      receivedAt: `2026-07-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:15:00.000Z`,
+      subject: `${template.subject} #${index + 1}`,
+      sender: `client${index + 1}@example.test`,
+      summary: template.summary,
+      confidence: isManualReview ? null : confidence,
+      classification: isManualReview
+        ? {
+            status: 'manual_review',
+            class_code: null,
+            class_name_ru: null,
+            reason_ru: 'В mock-данных имитируется недостаток надёжных данных.',
+            confidence: null,
+            message_ru: 'Требуется ручная проверка',
+          }
+        : isNewProject
+          ? {
+              status: 'new_project',
+              class_code: null,
+              class_name_ru: null,
+              reason_ru: 'Запрос не подходит под текущие направления.',
+              confidence,
+              message_ru: 'Это новый проект',
+            }
+          : {
+              status: 'classified',
+              class_code: template.classCode,
+              class_name_ru: template.className,
+              reason_ru: `Mock-классификация по признакам класса ${template.className}.`,
+              confidence,
+              message_ru: `Запрос относится к направлению ${template.className}.`,
+            },
+      warnings: isManualReview
+        ? ['Mock warning: требуется ручная проверка']
+        : [],
+      attachments: hasAttachment
+        ? [
+            {
+              id: `${String(index + 10).padStart(8, '0')}-aaaa-4aaa-8aaa-${String(index + 10).padStart(12, '0')}`,
+              filename: `mock_attachment_${index + 1}.pdf`,
+              contentType: 'application/pdf',
+              summary: 'Mock-вложение с техническими требованиями.',
+              keyFacts: [
+                'Есть исходные требования',
+                'Нужна проверка менеджера',
+              ],
+            },
+          ]
+        : [],
+    })
   }),
 ]
