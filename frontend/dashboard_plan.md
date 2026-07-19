@@ -43,12 +43,13 @@ React + TypeScript.
 
 - `Tailwind CSS` — быстрый, предсказуемый layout без тяжёлого UI framework.
 - `lucide-react` — иконки.
-- Небольшой набор собственных компонентов: `Button`, `Input`, `Select`,
-  `Badge`, `Card`, `Table`, `Spinner`, `Alert`, `EmptyState`.
+- Небольшой набор собственных компонентов: `Button`, `Input`, `Select`, `Badge`,
+  `Card`, `Table`, `Spinner`, `Alert`, `EmptyState`.
 
 Причина: dashboard простой, а внешний UI-kit может добавить больше сложности,
 чем пользы. Если позже потребуется ускорить визуальную полировку, можно добавить
-`shadcn/ui`, но для первого этапа достаточно собственных компонентов на Tailwind.
+`shadcn/ui`, но для первого этапа достаточно собственных компонентов на
+Tailwind.
 
 ### Графики
 
@@ -65,9 +66,9 @@ React + TypeScript.
 
 ## Безопасность и доступ к API
 
-Есть принципиальный нюанс: `READER_API_KEY` нельзя безопасно хранить в
-публичном browser bundle. Любой ключ, переданный во frontend через env, будет
-доступен пользователю в DevTools.
+Есть принципиальный нюанс: `READER_API_KEY` нельзя безопасно хранить в публичном
+browser bundle. Любой ключ, переданный во frontend через env, будет доступен
+пользователю в DevTools.
 
 Допустимые варианты:
 
@@ -345,8 +346,8 @@ type Classification = {
 }
 ```
 
-Причина: backend хранит `classification` как гибкий объект внутри `agent_result`.
-Жёсткая схема может ломаться при расширении полей.
+Причина: backend хранит `classification` как гибкий объект внутри
+`agent_result`. Жёсткая схема может ломаться при расширении полей.
 
 ## State management
 

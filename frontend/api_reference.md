@@ -52,13 +52,13 @@ GET /api/v1/emails
 
 Query параметры:
 
-| Параметр | Тип | Обязательный | Описание |
-| --- | --- | --- | --- |
-| `limit` | integer | нет | Размер страницы от `1` до `100`, по умолчанию `50`. |
-| `cursor` | string | нет | Opaque cursor из `next_cursor` для следующей страницы. |
-| `from` | datetime | нет | Нижняя граница `received_at`. |
-| `to` | datetime | нет | Верхняя граница `received_at`. |
-| `mailbox` | string | нет | Почтовый ящик, например `INBOX`. |
+| Параметр  | Тип      | Обязательный | Описание                                               |
+| --------- | -------- | ------------ | ------------------------------------------------------ |
+| `limit`   | integer  | нет          | Размер страницы от `1` до `100`, по умолчанию `50`.    |
+| `cursor`  | string   | нет          | Opaque cursor из `next_cursor` для следующей страницы. |
+| `from`    | datetime | нет          | Нижняя граница `received_at`.                          |
+| `to`      | datetime | нет          | Верхняя граница `received_at`.                         |
+| `mailbox` | string   | нет          | Почтовый ящик, например `INBOX`.                       |
 
 Пример ответа:
 
@@ -123,15 +123,9 @@ GET /api/v1/emails/{record_id}
     "confidence": 0.9,
     "message_ru": "..."
   },
-  "key_facts": [
-    "Срок поставки до 25 июля"
-  ],
-  "attachment_summaries": [
-    "original.pdf: коммерческое предложение"
-  ],
-  "warnings": [
-    "Проверить срок поставки"
-  ],
+  "key_facts": ["Срок поставки до 25 июля"],
+  "attachment_summaries": ["original.pdf: коммерческое предложение"],
+  "warnings": ["Проверить срок поставки"],
   "record_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "received_at": "2026-07-17T10:00:00Z",
   "processed_at": "2026-07-17T10:03:00Z",
@@ -143,9 +137,7 @@ GET /api/v1/emails/{record_id}
   "original_email": {
     "subject": "Тема",
     "from": "sender@example.test",
-    "to": [
-      "to@example.test"
-    ],
+    "to": ["to@example.test"],
     "cc": [],
     "bcc": [],
     "reply_to": [],
@@ -177,9 +169,7 @@ GET /api/v1/emails/{record_id}
       "is_inline": false,
       "content_id": null,
       "summary": "Коммерческое предложение на станок",
-      "key_facts": [
-        "Указан срок поставки"
-      ],
+      "key_facts": ["Указан срок поставки"],
       "processing_result": {},
       "download_url": "/api/v1/emails/<record_id>/attachments/<attachment_id>/content"
     }
@@ -199,7 +189,8 @@ GET /api/v1/emails/{record_id}
 - `warnings` — предупреждения обработки.
 - `attachments` — список файлов с метаданными, сводками и ссылками скачивания.
 - `raw_download_url` — ссылка на скачивание исходного `.eml`.
-- `original_email` и `agent_result` — расширенные данные для технического режима.
+- `original_email` и `agent_result` — расширенные данные для технического
+  режима.
 
 ## Статистика
 
@@ -217,11 +208,11 @@ GET /api/v1/statistics
 
 Query параметры:
 
-| Параметр | Тип | Обязательный | Описание |
-| --- | --- | --- | --- |
-| `from` | datetime | да | Начало периода, timezone обязателен, граница включается. |
-| `to` | datetime | да | Конец периода, timezone обязателен, граница не включается. |
-| `mailbox` | string | нет | Почтовый ящик, например `INBOX`. |
+| Параметр  | Тип      | Обязательный | Описание                                                   |
+| --------- | -------- | ------------ | ---------------------------------------------------------- |
+| `from`    | datetime | да           | Начало периода, timezone обязателен, граница включается.   |
+| `to`      | datetime | да           | Конец периода, timezone обязателен, граница не включается. |
+| `mailbox` | string   | нет          | Почтовый ящик, например `INBOX`.                           |
 
 Ограничения:
 
