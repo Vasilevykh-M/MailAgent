@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 
 import type { EmailListItem } from '../../../api'
-import { Badge, Button, Card, EmptyState } from '../../../shared'
+import { Badge, Card, EmptyState } from '../../../shared'
 import {
   formatConfidence,
   formatDateTime,
@@ -40,21 +40,45 @@ export function EmailList({
     useIntersectionObserver<HTMLDivElement>()
   const lastAutoLoadedCursorRef = useRef<string | null>(null)
   const lastAutoLoadAtRef = useRef(0)
+  const pendingAutoLoadRef = useRef<number | null>(null)
 
   useEffect(() => {
-    const now = Date.now()
+    if (pendingAutoLoadRef.current !== null) {
+      window.clearTimeout(pendingAutoLoadRef.current)
+      pendingAutoLoadRef.current = null
+    }
 
     if (
-      isIntersecting &&
-      hasNextPage &&
-      !isFetchingNextPage &&
-      nextCursor &&
-      lastAutoLoadedCursorRef.current !== nextCursor &&
-      now - lastAutoLoadAtRef.current >= autoLoadThrottleMs
+      !isIntersecting ||
+      !hasNextPage ||
+      isFetchingNextPage ||
+      !nextCursor ||
+      lastAutoLoadedCursorRef.current === nextCursor
     ) {
+      return
+    }
+
+    const now = Date.now()
+    const elapsed = now - lastAutoLoadAtRef.current
+
+    if (elapsed >= autoLoadThrottleMs) {
       lastAutoLoadedCursorRef.current = nextCursor
       lastAutoLoadAtRef.current = now
       onLoadMore()
+      return
+    }
+
+    pendingAutoLoadRef.current = window.setTimeout(() => {
+      lastAutoLoadedCursorRef.current = nextCursor
+      lastAutoLoadAtRef.current = Date.now()
+      onLoadMore()
+    }, autoLoadThrottleMs - elapsed)
+
+    return () => {
+      if (pendingAutoLoadRef.current !== null) {
+        window.clearTimeout(pendingAutoLoadRef.current)
+        pendingAutoLoadRef.current = null
+      }
     }
   }, [hasNextPage, isFetchingNextPage, isIntersecting, nextCursor, onLoadMore])
 
@@ -94,13 +118,6 @@ export function EmailList({
 
   return (
     <Card
-      actions={
-        hasNextPage ? (
-          <Button disabled={isFetchingNextPage} onClick={onLoadMore}>
-            {isFetchingNextPage ? 'Загрузка' : 'Загрузить ещё'}
-          </Button>
-        ) : null
-      }
       description="Локальный поиск применяется только к загруженным страницам."
       title="Письма"
       variant="muted"
