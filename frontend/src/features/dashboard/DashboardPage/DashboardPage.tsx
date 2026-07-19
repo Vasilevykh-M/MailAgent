@@ -1,31 +1,103 @@
+import { useMemo, useState } from 'react'
+
+import {
+  useEmailsInfinite,
+  useStatistics,
+  type EmailListItem,
+} from '../../../api'
 import { apiConfig } from '../../../api/config'
-import { Alert, Badge, Button, Card, EmptyState } from '../../../shared'
+import {
+  dateInputToIsoNextDay,
+  dateInputToIsoStart,
+  formatDateForInput,
+} from '../../../shared'
+import { Alert, Badge, Card } from '../../../shared'
+import {
+  DashboardFilters,
+  type DashboardFiltersValue,
+} from '../DashboardFilters'
+import { EmailList } from '../EmailList'
+import { HealthIndicator } from '../HealthIndicator'
+import { StatisticsCards } from '../StatisticsCards'
 
 import styles from './DashboardPage.module.css'
 
-const plannedSections = [
-  'Health indicator через /health/ready',
-  'KPI и графики через /api/v1/statistics',
-  'Список писем через /api/v1/emails',
-  'Карточка письма через /api/v1/emails/{record_id}',
-  'Скачивание вложений и исходного .eml',
-]
+function defaultFilters(): DashboardFiltersValue {
+  const today = new Date()
+  const monthStart = new Date(today)
+
+  monthStart.setDate(1)
+
+  return {
+    fromDate: formatDateForInput(monthStart),
+    toDate: formatDateForInput(today),
+    mailbox: apiConfig.defaultMailbox,
+    search: '',
+  }
+}
+
+function matchesSearch(item: EmailListItem, search: string) {
+  const normalizedSearch = search.trim().toLowerCase()
+
+  if (!normalizedSearch) {
+    return true
+  }
+
+  return [item.subject, item.from, item.summary_preview]
+    .join(' ')
+    .toLowerCase()
+    .includes(normalizedSearch)
+}
 
 export function DashboardPage() {
+  const [filters, setFilters] = useState(defaultFilters)
+  const apiParams = useMemo(
+    () => ({
+      from: dateInputToIsoStart(filters.fromDate),
+      to: dateInputToIsoNextDay(filters.toDate),
+      mailbox: filters.mailbox.trim() || null,
+      limit: 25,
+    }),
+    [filters.fromDate, filters.mailbox, filters.toDate],
+  )
+  const statistics = useStatistics({
+    from: apiParams.from,
+    to: apiParams.to,
+    mailbox: apiParams.mailbox,
+  })
+  const emails = useEmailsInfinite(apiParams)
+  const emailItems = useMemo(
+    () =>
+      emails.data?.pages
+        .flatMap((page) => page.items)
+        .filter((item) => matchesSearch(item, filters.search)) ?? [],
+    [emails.data?.pages, filters.search],
+  )
+  const isRefreshing = statistics.isFetching || emails.isFetching
+
+  function refreshDashboard() {
+    void statistics.refetch()
+    void emails.refetch()
+  }
+
   return (
     <main className={styles.page}>
       <div className={styles.container}>
         <header className={styles.hero}>
           <div className={styles.headerRow}>
             <p className={styles.eyebrow}>Mail Agent</p>
-            <Badge tone="success">Dev mocks ready</Badge>
+            <div className={styles.statusGroup}>
+              <HealthIndicator />
+              <Badge tone="accent">MSW в dev</Badge>
+            </div>
           </div>
           <div className={styles.heroContent}>
             <div>
               <h1 className={styles.title}>Dashboard обработанных писем</h1>
               <p className={styles.description}>
-                Базовое React + TypeScript окружение готово. Следующие этапы —
-                API client, TanStack Query hooks и рабочие виджеты dashboard.
+                Первый рабочий слой dashboard: состояние API, фильтры периода,
+                KPI и список обработанных писем. Detail panel будет подключён
+                отдельным шагом.
               </p>
             </div>
             <div className={styles.configCard}>
@@ -39,31 +111,43 @@ export function DashboardPage() {
           </div>
         </header>
 
-        <Alert title="Двигаемся постепенно" tone="info">
-          На этом шаге зафиксированы визуальные правила и базовые UI primitives.
-          Следующий технический слой — API client, Zod-схемы и query hooks.
+        <Alert title="Локальные ограничения MVP" tone="info">
+          Поиск применяется только к уже загруженным страницам. API пока не даёт
+          server-side поиск, фильтр по классу и список mailbox.
         </Alert>
 
-        <section className={styles.sectionGrid}>
-          {plannedSections.map((section) => (
-            <Card className={styles.sectionCard} key={section} variant="muted">
-              <div className={styles.cardMarker} />
-              <p>{section}</p>
-            </Card>
-          ))}
-        </section>
+        <DashboardFilters
+          isRefreshing={isRefreshing}
+          onChange={setFilters}
+          onRefresh={refreshDashboard}
+          value={filters}
+        />
 
-        <Card
-          actions={<Button variant="primary">Следующий этап: API слой</Button>}
-          description="Здесь появятся KPI, список писем и карточка выбранного письма."
-          title="Каркас dashboard"
-          variant="muted"
-        >
-          <EmptyState
-            description="UI primitives готовы, но реальные widgets пока не подключены. Это намеренно: сначала стабилизируем основу."
-            title="Данные будут подключены следующим шагом"
+        <StatisticsCards
+          data={statistics.data}
+          isError={statistics.isError}
+          isLoading={statistics.isLoading}
+        />
+
+        <div className={styles.contentGrid}>
+          <EmailList
+            hasNextPage={emails.hasNextPage}
+            isError={emails.isError}
+            isFetchingNextPage={emails.isFetchingNextPage}
+            isLoading={emails.isLoading}
+            items={emailItems}
+            onLoadMore={() => void emails.fetchNextPage()}
           />
-        </Card>
+          <Card
+            description="После выбора письма здесь появятся summary, classification, warnings, content и attachments."
+            title="Карточка письма"
+            variant="muted"
+          >
+            <div className={styles.detailPlaceholder}>
+              Выбор письма будет подключён следующим шагом.
+            </div>
+          </Card>
+        </div>
       </div>
     </main>
   )
