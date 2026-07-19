@@ -69,3 +69,7 @@ export function getConfidenceTone(value: number | null | undefined) {
 export function formatNullable(value: string | null | undefined): string {
   return value?.trim() || '—'
 }
+
+export function formatJson(value: unknown): string {
+  return JSON.stringify(value, null, 2)
+}

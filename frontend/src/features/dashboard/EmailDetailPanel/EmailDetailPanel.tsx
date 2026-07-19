@@ -6,7 +6,14 @@ import {
   downloadRawEmail,
   type EmailDetail,
 } from '../../../api'
-import { Alert, Badge, Button, Card, EmptyState } from '../../../shared'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  JsonViewer,
+} from '../../../shared'
 import {
   formatConfidence,
   formatDateTime,
@@ -167,6 +174,19 @@ export function EmailDetailPanel({
         </section>
 
         <section className={styles.section}>
+          <h3>Сводки вложений</h3>
+          {data.attachment_summaries.length > 0 ? (
+            <ul className={styles.list}>
+              {data.attachment_summaries.map((summary) => (
+                <li key={summary}>{summary}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.muted}>Сводки вложений отсутствуют.</p>
+          )}
+        </section>
+
+        <section className={styles.section}>
           <h3>Вложения</h3>
           {data.attachments.length > 0 ? (
             <div className={styles.attachments}>
@@ -221,6 +241,16 @@ export function EmailDetailPanel({
               {formatDateTime(data.processed_at)}
             </Metric>
           </dl>
+          <div className={styles.jsonSections}>
+            <details>
+              <summary>original_email JSON</summary>
+              <JsonViewer value={data.original_email} />
+            </details>
+            <details>
+              <summary>agent_result JSON</summary>
+              <JsonViewer value={data.agent_result} />
+            </details>
+          </div>
         </details>
       </div>
     </Card>

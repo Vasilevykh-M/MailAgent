@@ -120,6 +120,20 @@
   gap: var(--space-3);
 }
 
+.jsonSections {
+  display: flex;
+  margin-top: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.jsonSections details {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.28);
+}
+
 .skeletonLarge,
 .skeletonSmall {
   border-radius: var(--radius-lg);

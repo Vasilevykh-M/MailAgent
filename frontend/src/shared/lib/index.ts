@@ -6,6 +6,7 @@ export {
   formatDateTime,
   formatFileSize,
   formatInteger,
+  formatJson,
   formatNullable,
   getConfidenceTone,
 } from './format'
