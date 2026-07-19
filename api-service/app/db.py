@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, Integer, String, Text, and_, delete, select, text, tuple_
+from sqlalchemy import BigInteger, DateTime, Integer, String, Text, and_, delete, func, select, text, tuple_
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -334,3 +334,71 @@ class ResultRepository:
             )
             for row in rows
         ]
+
+    async def statistics(self, start: datetime, end: datetime, *, mailbox: str | None = None) -> dict[str, Any]:
+        """Возвращает агрегаты периода, не делая неограниченного сканирования партиций."""
+
+        total_emails = 0
+        total_attachments = 0
+        classifications: dict[tuple[str | None, str | None, str | None], int] = {}
+        month = _month_bounds(start)[0]
+        async with self.database.sessions() as session:
+            # Лимит периода проверяется router; каждая итерация ограничена одной monthly partition.
+            while month < end:
+                month_end = _month_bounds(month)[1]
+                window_start, window_end = max(start, month), min(end, month_end)
+                email_conditions = [Email.received_at >= window_start, Email.received_at < window_end]
+                attachment_conditions = [Attachment.received_at >= window_start, Attachment.received_at < window_end]
+                if mailbox:
+                    email_conditions.append(Email.mailbox == mailbox)
+                    attachment_conditions.append(
+                        Attachment.record_id.in_(select(Email.record_id).where(and_(*email_conditions)))
+                    )
+
+                total_emails += int(
+                    (
+                        await session.execute(select(func.count(Email.record_id)).where(and_(*email_conditions)))
+                    ).scalar_one()
+                )
+                total_attachments += int(
+                    (
+                        await session.execute(
+                            select(func.count(Attachment.attachment_id)).where(and_(*attachment_conditions))
+                        )
+                    ).scalar_one()
+                )
+
+                classification = Email.agent_result["summary"]["classification"]
+                status = classification["status"].astext
+                class_code = classification["class_code"].astext
+                class_name_ru = classification["class_name_ru"].astext
+                rows = await session.execute(
+                    select(status, class_code, class_name_ru, func.count(Email.record_id))
+                    .where(and_(*email_conditions))
+                    .group_by(status, class_code, class_name_ru)
+                )
+                for item_status, item_code, item_name, count in rows:
+                    key = (
+                        str(item_status) if item_status is not None else None,
+                        str(item_code) if item_code is not None else None,
+                        str(item_name) if item_name is not None else None,
+                    )
+                    classifications[key] = classifications.get(key, 0) + int(count)
+                month = month_end
+
+        return {
+            "total_emails": total_emails,
+            "total_attachments": total_attachments,
+            "classifications": [
+                {
+                    "status": status,
+                    "class_code": class_code,
+                    "class_name_ru": class_name_ru,
+                    "count": count,
+                }
+                for (status, class_code, class_name_ru), count in sorted(
+                    classifications.items(),
+                    key=lambda item: (-item[1], item[0][1] or "", item[0][0] or ""),
+                )
+            ],
+        }

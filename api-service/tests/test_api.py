@@ -90,6 +90,24 @@ class MemoryRepository:
         ]
         return values[:limit]
 
+    async def statistics(self, start, end, *, mailbox=None):
+        assert start == datetime(2026, 7, 1, tzinfo=UTC)
+        assert end == datetime(2026, 8, 1, tzinfo=UTC)
+        assert mailbox == "INBOX"
+        return {
+            "total_emails": 12,
+            "total_attachments": 7,
+            "classifications": [
+                {
+                    "status": "classified",
+                    "class_code": "MACHINES",
+                    "class_name_ru": "Станки",
+                    "count": 9,
+                },
+                {"status": "new_project", "class_code": None, "class_name_ru": None, "count": 3},
+            ],
+        }
+
     async def detail(self, record_id):
         payload = self.payloads.get(record_id)
         if payload is None:
@@ -249,6 +267,40 @@ def test_anonymous_reader_does_not_allow_anonymous_writer() -> None:
     assert reader_response.status_code == 200
     writer_response = test_client.put(f"/api/v1/internal/emails/{RECORD_ID}", files=files(payload_for()))
     assert writer_response.status_code == 401
+
+
+def test_reader_statistics_for_period() -> None:
+    test_client, _repository, _storage = client()
+
+    response = test_client.get(
+        "/api/v1/statistics?from=2026-07-01T00:00:00Z&to=2026-08-01T00:00:00Z&mailbox=INBOX",
+        headers={"X-API-Key": "reader"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "from": "2026-07-01T00:00:00Z",
+        "to": "2026-08-01T00:00:00Z",
+        "mailbox": "INBOX",
+        "total_emails": 12,
+        "total_attachments": 7,
+        "classifications": [
+            {"status": "classified", "class_code": "MACHINES", "class_name_ru": "Станки", "count": 9},
+            {"status": "new_project", "class_code": None, "class_name_ru": None, "count": 3},
+        ],
+    }
+
+
+def test_statistics_rejects_invalid_period() -> None:
+    test_client, _repository, _storage = client()
+
+    response = test_client.get(
+        "/api/v1/statistics?from=2026-08-01T00:00:00Z&to=2026-07-01T00:00:00Z",
+        headers={"X-API-Key": "reader"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"] == "invalid_payload"
 
 
 def test_reader_list_and_detail_stream_without_storage_url() -> None:

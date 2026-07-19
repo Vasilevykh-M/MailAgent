@@ -125,6 +125,22 @@ class EmailListResponse(APIModel):
     has_more: bool
 
 
+class ClassificationStatisticsItem(APIModel):
+    status: str | None = None
+    class_code: str | None = None
+    class_name_ru: str | None = None
+    count: int = Field(ge=0)
+
+
+class StatisticsResponse(APIModel):
+    from_: datetime = Field(alias="from")
+    to: datetime
+    mailbox: str | None = None
+    total_emails: int = Field(ge=0)
+    total_attachments: int = Field(ge=0)
+    classifications: list[ClassificationStatisticsItem]
+
+
 class AttachmentResponse(APIModel):
     attachment_id: str
     id: str

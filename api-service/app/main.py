@@ -7,7 +7,7 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 from urllib.parse import quote
 
@@ -26,6 +26,7 @@ from .schemas import (
     IngestionPayload,
     IngestionResponse,
     OriginalEmail,
+    StatisticsResponse,
     decode_cursor,
     encode_cursor,
 )
@@ -240,6 +241,32 @@ def create_app(
             decoded = None
         next_cursor = encode_cursor(items[-1].received_at, items[-1].record_id) if items and has_more else None
         return EmailListResponse(items=items, next_cursor=next_cursor, has_more=has_more)
+
+    @app.get("/api/v1/statistics", response_model=StatisticsResponse)
+    async def get_statistics(
+        from_: Annotated[datetime, Query(alias="from")],
+        to: Annotated[datetime, Query()],
+        mailbox: str | None = None,
+        _: None = Depends(require_reader(selected)),
+    ) -> StatisticsResponse:
+        if from_.tzinfo is None or to.tzinfo is None:
+            raise ValidationAPIError("Statistics period must include a timezone")
+        start, end = from_.astimezone(UTC), to.astimezone(UTC)
+        if start >= end:
+            raise ValidationAPIError("Statistics period must have from before to")
+        if end - start > timedelta(days=3660):
+            raise ValidationAPIError("Statistics period must not exceed 10 years")
+        values = await result_repository.statistics(start, end, mailbox=mailbox)
+        return StatisticsResponse.model_validate(
+            {
+                "from": start,
+                "to": end,
+                "mailbox": mailbox,
+                "total_emails": int(values["total_emails"]),
+                "total_attachments": int(values["total_attachments"]),
+                "classifications": values["classifications"],
+            }
+        )
 
     @app.get("/api/v1/emails/{record_id}", response_model=EmailDetail)
     async def get_email(record_id: str, _: None = Depends(require_reader(selected))) -> EmailDetail:
