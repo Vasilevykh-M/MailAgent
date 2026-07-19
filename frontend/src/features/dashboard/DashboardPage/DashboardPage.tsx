@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import {
@@ -24,6 +24,8 @@ import { HealthIndicator } from '../HealthIndicator'
 import { StatisticsCards } from '../StatisticsCards'
 
 import styles from './DashboardPage.module.css'
+
+const emailPageLimit = 10
 
 function defaultFilters(): DashboardFiltersValue {
   const today = new Date()
@@ -61,7 +63,7 @@ export function DashboardPage() {
       from: dateInputToIsoStart(filters.fromDate),
       to: dateInputToIsoNextDay(filters.toDate),
       mailbox: filters.mailbox.trim() || null,
-      limit: 25,
+      limit: emailPageLimit,
     }),
     [filters.fromDate, filters.mailbox, filters.toDate],
   )
@@ -71,6 +73,7 @@ export function DashboardPage() {
     mailbox: apiParams.mailbox,
   })
   const emails = useEmailsInfinite(apiParams)
+  const { fetchNextPage } = emails
   const emailDetail = useEmailDetail(recordId)
   const emailItems = useMemo(
     () =>
@@ -79,6 +82,8 @@ export function DashboardPage() {
         .filter((item) => matchesSearch(item, filters.search)) ?? [],
     [emails.data?.pages, filters.search],
   )
+  const nextEmailCursor =
+    emails.data?.pages[emails.data.pages.length - 1]?.next_cursor ?? null
   const isRefreshing = statistics.isFetching || emails.isFetching
 
   function refreshDashboard() {
@@ -92,6 +97,10 @@ export function DashboardPage() {
   function selectEmail(selectedRecordId: string) {
     navigate(`/emails/${selectedRecordId}`)
   }
+
+  const loadMoreEmails = useCallback(() => {
+    void fetchNextPage()
+  }, [fetchNextPage])
 
   return (
     <main className={styles.page}>
@@ -149,7 +158,8 @@ export function DashboardPage() {
             isFetchingNextPage={emails.isFetchingNextPage}
             isLoading={emails.isLoading}
             items={emailItems}
-            onLoadMore={() => void emails.fetchNextPage()}
+            nextCursor={nextEmailCursor}
+            onLoadMore={loadMoreEmails}
             onSelect={selectEmail}
             selectedId={recordId}
           />
