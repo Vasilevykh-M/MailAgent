@@ -22,6 +22,7 @@ import { EmailDetailPanel } from '../EmailDetailPanel'
 import { EmailList } from '../EmailList'
 import { HealthIndicator } from '../HealthIndicator'
 import { StatisticsCards } from '../StatisticsCards'
+import { StatisticsCharts } from '../StatisticsCharts'
 
 import styles from './DashboardPage.module.css'
 
@@ -160,6 +161,12 @@ export function DashboardPage() {
         />
 
         <StatisticsCards
+          data={statistics.data}
+          isError={statistics.isError}
+          isLoading={statistics.isLoading}
+        />
+
+        <StatisticsCharts
           data={statistics.data}
           isError={statistics.isError}
           isLoading={statistics.isLoading}
