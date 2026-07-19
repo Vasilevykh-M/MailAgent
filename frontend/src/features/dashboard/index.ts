@@ -1,4 +1,5 @@
 export { DashboardFilters } from './DashboardFilters'
+export { EmailDetailPanel } from './EmailDetailPanel'
 export { DashboardPage } from './DashboardPage'
 export { EmailList } from './EmailList'
 export { HealthIndicator } from './HealthIndicator'

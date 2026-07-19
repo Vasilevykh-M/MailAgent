@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import {
+  useEmailDetail,
   useEmailsInfinite,
   useStatistics,
   type EmailListItem,
@@ -11,11 +13,12 @@ import {
   dateInputToIsoStart,
   formatDateForInput,
 } from '../../../shared'
-import { Alert, Badge, Card } from '../../../shared'
+import { Alert, Badge } from '../../../shared'
 import {
   DashboardFilters,
   type DashboardFiltersValue,
 } from '../DashboardFilters'
+import { EmailDetailPanel } from '../EmailDetailPanel'
 import { EmailList } from '../EmailList'
 import { HealthIndicator } from '../HealthIndicator'
 import { StatisticsCards } from '../StatisticsCards'
@@ -50,6 +53,8 @@ function matchesSearch(item: EmailListItem, search: string) {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate()
+  const { recordId = null } = useParams()
   const [filters, setFilters] = useState(defaultFilters)
   const apiParams = useMemo(
     () => ({
@@ -66,6 +71,7 @@ export function DashboardPage() {
     mailbox: apiParams.mailbox,
   })
   const emails = useEmailsInfinite(apiParams)
+  const emailDetail = useEmailDetail(recordId)
   const emailItems = useMemo(
     () =>
       emails.data?.pages
@@ -78,6 +84,13 @@ export function DashboardPage() {
   function refreshDashboard() {
     void statistics.refetch()
     void emails.refetch()
+    if (recordId) {
+      void emailDetail.refetch()
+    }
+  }
+
+  function selectEmail(selectedRecordId: string) {
+    navigate(`/emails/${selectedRecordId}`)
   }
 
   return (
@@ -137,16 +150,15 @@ export function DashboardPage() {
             isLoading={emails.isLoading}
             items={emailItems}
             onLoadMore={() => void emails.fetchNextPage()}
+            onSelect={selectEmail}
+            selectedId={recordId}
           />
-          <Card
-            description="После выбора письма здесь появятся summary, classification, warnings, content и attachments."
-            title="Карточка письма"
-            variant="muted"
-          >
-            <div className={styles.detailPlaceholder}>
-              Выбор письма будет подключён следующим шагом.
-            </div>
-          </Card>
+          <EmailDetailPanel
+            data={emailDetail.data}
+            isError={emailDetail.isError}
+            isLoading={emailDetail.isLoading}
+            isPlaceholder={!recordId}
+          />
         </div>
       </div>
     </main>

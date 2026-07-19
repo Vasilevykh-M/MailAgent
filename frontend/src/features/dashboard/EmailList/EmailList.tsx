@@ -14,7 +14,9 @@ type EmailListProps = {
   isLoading: boolean
   isError: boolean
   isFetchingNextPage: boolean
+  selectedId: string | null
   onLoadMore: () => void
+  onSelect: (recordId: string) => void
 }
 
 export function EmailList({
@@ -23,7 +25,9 @@ export function EmailList({
   isLoading,
   isError,
   isFetchingNextPage,
+  selectedId,
   onLoadMore,
+  onSelect,
 }: EmailListProps) {
   if (isLoading) {
     return (
@@ -74,7 +78,13 @@ export function EmailList({
     >
       <div className={styles.list}>
         {items.map((item) => (
-          <article className={styles.row} key={item.id}>
+          <button
+            aria-pressed={item.id === selectedId}
+            className={`${styles.row} ${item.id === selectedId ? styles.selected : ''}`}
+            key={item.id}
+            onClick={() => onSelect(item.id)}
+            type="button"
+          >
             <div className={styles.rowHeader}>
               <h3>{item.subject || 'Без темы'}</h3>
               <Badge tone={getConfidenceTone(item.confidence)}>
@@ -87,7 +97,7 @@ export function EmailList({
               <span>{formatDateTime(item.received_at)}</span>
               <span>{item.attachment_count} влож.</span>
             </div>
-          </article>
+          </button>
         ))}
       </div>
     </Card>
