@@ -3,9 +3,16 @@ import { createRoot } from 'react-dom/client'
 
 import './index.css'
 import { App } from './app/App'
+import { startMockWorker } from './mocks/startMockWorker'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+async function bootstrap() {
+  await startMockWorker()
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+}
+
+void bootstrap()
