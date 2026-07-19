@@ -97,6 +97,10 @@
   grid-template-columns: 1fr;
 }
 
+.detailPanelAnchor {
+  scroll-margin-top: var(--space-6);
+}
+
 @media (min-width: 1024px) {
   .heroContent {
     flex-direction: row;
