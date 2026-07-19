@@ -65,3 +65,7 @@ export function getConfidenceTone(value: number | null | undefined) {
 
   return 'danger'
 }
+
+export function formatNullable(value: string | null | undefined): string {
+  return value?.trim() || '—'
+}

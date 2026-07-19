@@ -5,10 +5,28 @@
 }
 
 .row {
+  width: 100%;
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  cursor: pointer;
   background: var(--color-surface-strong);
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.row:hover {
+  border-color: var(--color-border-strong);
+  background: rgba(30, 41, 59, 0.92);
+  transform: translateY(-1px);
+}
+
+.selected {
+  border-color: rgba(34, 211, 238, 0.52);
+  background: var(--color-accent-muted);
 }
 
 .rowHeader {

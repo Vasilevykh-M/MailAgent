@@ -6,6 +6,7 @@ export {
   formatDateTime,
   formatFileSize,
   formatInteger,
+  formatNullable,
   getConfidenceTone,
 } from './format'
 export { toAbsoluteApiUrl } from './url'

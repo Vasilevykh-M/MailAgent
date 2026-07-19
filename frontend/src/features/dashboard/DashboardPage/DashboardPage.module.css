@@ -97,23 +97,6 @@
   grid-template-columns: 1fr;
 }
 
-.detailPlaceholder {
-  display: grid;
-  min-height: 280px;
-  place-items: center;
-  border: 1px dashed var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-strong);
-  margin: 0;
-  padding: var(--space-8);
-  color: var(--color-text-subtle);
-  text-align: center;
-}
-
-.detailPlaceholder {
-  line-height: 1.6;
-}
-
 @media (min-width: 1024px) {
   .heroContent {
     flex-direction: row;
