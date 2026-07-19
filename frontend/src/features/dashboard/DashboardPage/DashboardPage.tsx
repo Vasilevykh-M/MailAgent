@@ -1,10 +1,13 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import {
+  queryKeys,
   useEmailDetail,
   useEmailsInfinite,
   useStatistics,
+  type EmailDetail,
   type EmailListItem,
 } from '../../../api'
 import { apiConfig } from '../../../api/config'
@@ -39,6 +42,9 @@ function defaultFilters(): DashboardFiltersValue {
     toDate: formatDateForInput(today),
     mailbox: apiConfig.defaultMailbox,
     search: '',
+    attachmentFilter: 'all',
+    confidenceFilter: 'all',
+    statusFilter: 'all',
   }
 }
 
@@ -55,8 +61,66 @@ function matchesSearch(item: EmailListItem, search: string) {
     .includes(normalizedSearch)
 }
 
+function matchesAttachmentFilter(
+  item: EmailListItem,
+  filter: DashboardFiltersValue['attachmentFilter'],
+) {
+  if (filter === 'with') {
+    return item.attachment_count > 0
+  }
+
+  if (filter === 'without') {
+    return item.attachment_count === 0
+  }
+
+  return true
+}
+
+function matchesConfidenceFilter(
+  item: EmailListItem,
+  filter: DashboardFiltersValue['confidenceFilter'],
+) {
+  if (filter === 'none') {
+    return item.confidence === null
+  }
+
+  if (filter === 'high') {
+    return typeof item.confidence === 'number' && item.confidence >= 0.8
+  }
+
+  if (filter === 'medium') {
+    return (
+      typeof item.confidence === 'number' &&
+      item.confidence >= 0.5 &&
+      item.confidence < 0.8
+    )
+  }
+
+  if (filter === 'low') {
+    return typeof item.confidence === 'number' && item.confidence < 0.5
+  }
+
+  return true
+}
+
+function matchesStatusFilter(
+  detail: EmailDetail | undefined,
+  filter: DashboardFiltersValue['statusFilter'],
+) {
+  if (filter === 'all') {
+    return true
+  }
+
+  if (filter === 'uncached') {
+    return !detail
+  }
+
+  return detail?.classification?.status === filter
+}
+
 export function DashboardPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { recordId = null } = useParams()
   const detailPanelRef = useRef<HTMLDivElement | null>(null)
   const [filters, setFilters] = useState(defaultFilters)
@@ -77,25 +141,22 @@ export function DashboardPage() {
   const emails = useEmailsInfinite(apiParams)
   const { fetchNextPage } = emails
   const emailDetail = useEmailDetail(recordId)
-  const emailItems = useMemo(
-    () =>
-      emails.data?.pages
-        .flatMap((page) => page.items)
-        .filter((item) => matchesSearch(item, filters.search)) ?? [],
-    [emails.data?.pages, filters.search],
-  )
+  const emailItems =
+    emails.data?.pages
+      .flatMap((page) => page.items)
+      .filter((item) => matchesSearch(item, filters.search))
+      .filter((item) => matchesAttachmentFilter(item, filters.attachmentFilter))
+      .filter((item) => matchesConfidenceFilter(item, filters.confidenceFilter))
+      .filter((item) =>
+        matchesStatusFilter(
+          queryClient.getQueryData<EmailDetail>(
+            queryKeys.emails.detail(item.id),
+          ),
+          filters.statusFilter,
+        ),
+      ) ?? []
   const nextEmailCursor =
     emails.data?.pages[emails.data.pages.length - 1]?.next_cursor ?? null
-  const isRefreshing = statistics.isFetching || emails.isFetching
-
-  function refreshDashboard() {
-    void statistics.refetch()
-    void emails.refetch()
-    if (recordId) {
-      void emailDetail.refetch()
-    }
-  }
-
   function selectEmail(selectedRecordId: string) {
     navigate(`/emails/${selectedRecordId}`)
   }
@@ -150,15 +211,11 @@ export function DashboardPage() {
 
         <Alert title="Локальные ограничения MVP" tone="info">
           Поиск применяется только к уже загруженным страницам. API пока не даёт
-          server-side поиск, фильтр по классу и список mailbox.
+          server-side поиск, фильтр по классу и список mailbox. Фильтр по
+          статусу работает только для писем, detail которых уже есть в кеше.
         </Alert>
 
-        <DashboardFilters
-          isRefreshing={isRefreshing}
-          onChange={setFilters}
-          onRefresh={refreshDashboard}
-          value={filters}
-        />
+        <DashboardFilters onChange={setFilters} value={filters} />
 
         <StatisticsCards
           data={statistics.data}
