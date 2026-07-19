@@ -1,4 +1,5 @@
-import { apiConfig } from '../../api/config'
+import { apiConfig } from '../../../api/config'
+import { Alert, Badge, Button, Card, EmptyState } from '../../../shared'
 
 import styles from './DashboardPage.module.css'
 
@@ -15,7 +16,10 @@ export function DashboardPage() {
     <main className={styles.page}>
       <div className={styles.container}>
         <header className={styles.hero}>
-          <p className={styles.eyebrow}>Mail Agent</p>
+          <div className={styles.headerRow}>
+            <p className={styles.eyebrow}>Mail Agent</p>
+            <Badge tone="success">Dev mocks ready</Badge>
+          </div>
           <div className={styles.heroContent}>
             <div>
               <h1 className={styles.title}>Dashboard обработанных писем</h1>
@@ -35,14 +39,31 @@ export function DashboardPage() {
           </div>
         </header>
 
+        <Alert title="Двигаемся постепенно" tone="info">
+          На этом шаге зафиксированы визуальные правила и базовые UI primitives.
+          Следующий технический слой — API client, Zod-схемы и query hooks.
+        </Alert>
+
         <section className={styles.sectionGrid}>
           {plannedSections.map((section) => (
-            <article className={styles.sectionCard} key={section}>
+            <Card className={styles.sectionCard} key={section} variant="muted">
               <div className={styles.cardMarker} />
               <p>{section}</p>
-            </article>
+            </Card>
           ))}
         </section>
+
+        <Card
+          actions={<Button variant="primary">Следующий этап: API слой</Button>}
+          description="Здесь появятся KPI, список писем и карточка выбранного письма."
+          title="Каркас dashboard"
+          variant="muted"
+        >
+          <EmptyState
+            description="UI primitives готовы, но реальные widgets пока не подключены. Это намеренно: сначала стабилизируем основу."
+            title="Данные будут подключены следующим шагом"
+          />
+        </Card>
       </div>
     </main>
   )

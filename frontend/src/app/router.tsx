@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
-import { DashboardPage } from '../features/dashboard/DashboardPage'
+import { DashboardPage } from '../features'
 
 export function AppRouter() {
   return (
