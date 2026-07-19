@@ -283,15 +283,16 @@ def test_cors_allows_only_configured_preview_origin() -> None:
         "/api/v1/statistics",
         headers={
             "Origin": "http://localhost:4173",
-            "Access-Control-Request-Method": "GET",
-            "Access-Control-Request-Headers": "X-API-Key",
+            "Access-Control-Request-Method": "PUT",
+            "Access-Control-Request-Headers": "X-API-Key, X-Custom-Header",
         },
     )
     denied = test_client.get("/health/live", headers={"Origin": "http://localhost:5173"})
 
     assert preflight.status_code == 200
     assert preflight.headers["access-control-allow-origin"] == "http://localhost:4173"
-    assert "X-API-Key" in preflight.headers["access-control-allow-headers"]
+    assert "PUT" in preflight.headers["access-control-allow-methods"]
+    assert "X-Custom-Header" in preflight.headers["access-control-allow-headers"]
     assert "access-control-allow-origin" not in denied.headers
 
 

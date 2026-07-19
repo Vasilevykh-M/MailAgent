@@ -26,10 +26,11 @@ curl -X PUT "http://127.0.0.1:8080/api/v1/internal/emails/$RECORD_ID" \
 
 Для браузерного frontend задайте `CORS_ALLOWED_ORIGINS` в корневом `.env`,
 например `http://localhost:4173` или несколько origin через запятую. API отвечает
-на CORS только для перечисленных origin, разрешает read-only `GET` и отдаёт
-`Content-Disposition` для скачиваемых вложений. Явное значение `*` открывает
-CORS для любых origin; используйте его только осознанно, особенно вместе с
-`ALLOW_ANONYMOUS_READER=true`.
+на CORS только для перечисленных origin, разрешает все HTTP-методы и заголовки и
+отдаёт `Content-Disposition` для скачиваемых вложений. Явное значение `*`
+открывает CORS для любых origin; используйте его только осознанно, особенно вместе
+с `ALLOW_ANONYMOUS_READER=true`. CORS не отменяет проверку `WRITER_API_KEY` для
+записи.
 
 - `GET /api/v1/emails?limit=50&cursor=...&from=...&to=...&mailbox=INBOX` — лёгкий список с opaque keyset cursor. Каждый элемент содержит `id` (он же `record_id`), `subject`, `from`, `received_at`, preview, количество вложений и confidence. Максимум `100`.
 - `GET /api/v1/emails/{record_id}` — полная карточка письма. Верхнеуровневые поля `id`, `subject`, `from`, `received_at`, `content`, `summary`, `classification`, `key_facts`, `attachment_summaries` и `warnings` предназначены для интерфейса. `content` — нормализованный plain-text тела письма; исходные текстовая и HTML-версии остаются в `original_email`.

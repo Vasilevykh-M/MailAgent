@@ -112,8 +112,8 @@ def create_app(
         CORSMiddleware,
         allow_origins=selected.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET"],
-        allow_headers=["Authorization", "X-API-Key"],
+        allow_methods=["*"],
+        allow_headers=["*"],
         expose_headers=["Content-Disposition", "Content-Length", "X-Request-ID"],
         max_age=600,
     )
