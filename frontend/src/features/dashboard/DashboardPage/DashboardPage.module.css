@@ -138,9 +138,4 @@
   .contentGrid {
     grid-template-columns: minmax(0, 1.12fr) minmax(360px, 0.88fr);
   }
-
-  .detailPanelAnchor {
-    position: sticky;
-    top: var(--space-6);
-  }
 }
