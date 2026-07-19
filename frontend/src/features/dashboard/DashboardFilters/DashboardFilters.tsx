@@ -108,7 +108,7 @@ export function DashboardFilters({ value, onChange }: DashboardFiltersProps) {
           </select>
         </label>
         <label className={styles.field}>
-          <span>Статус (кеш)</span>
+          <span>Статус</span>
           <select
             onChange={(event) =>
               onChange({
@@ -123,7 +123,7 @@ export function DashboardFilters({ value, onChange }: DashboardFiltersProps) {
             <option value="classified">Классифицировано</option>
             <option value="new_project">Новый проект</option>
             <option value="manual_review">Ручная проверка</option>
-            <option value="uncached">Detail не загружен</option>
+            <option value="uncached">Без данных статуса</option>
           </select>
         </label>
       </div>

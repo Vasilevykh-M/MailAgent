@@ -54,6 +54,13 @@
   --control-padding-inline: 12px;
 }
 
+@media (max-width: 640px) {
+  :root {
+    --space-page-x: 12px;
+    --space-page-y: 16px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

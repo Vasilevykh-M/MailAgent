@@ -118,7 +118,7 @@ export function EmailList({
 
   return (
     <Card
-      description="Локальный поиск применяется только к загруженным страницам."
+      description="Письма за выбранный период."
       title="Письма"
       variant="muted"
     >
@@ -149,9 +149,7 @@ export function EmailList({
       </div>
       {hasNextPage && (
         <p className={styles.autoLoadStatus}>
-          {isFetchingNextPage
-            ? 'Загружаем следующую страницу…'
-            : 'Следующая страница загрузится автоматически внизу списка.'}
+          {isFetchingNextPage ? 'Загружаем письма…' : 'Прокрутите ниже'}
         </p>
       )}
     </Card>

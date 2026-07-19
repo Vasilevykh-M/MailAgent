@@ -16,7 +16,7 @@ import {
   dateInputToIsoStart,
   formatDateForInput,
 } from '../../../shared'
-import { Alert, Badge } from '../../../shared'
+import { Badge } from '../../../shared'
 import {
   DashboardFilters,
   type DashboardFiltersValue,
@@ -186,16 +186,15 @@ export function DashboardPage() {
             <p className={styles.eyebrow}>Mail Agent</p>
             <div className={styles.statusGroup}>
               <HealthIndicator />
-              <Badge tone="accent">MSW в dev</Badge>
+              <Badge tone="accent">Dashboard</Badge>
             </div>
           </div>
           <div className={styles.heroContent}>
             <div>
               <h1 className={styles.title}>Dashboard обработанных писем</h1>
               <p className={styles.description}>
-                Первый рабочий слой dashboard: состояние API, фильтры периода,
-                KPI и список обработанных писем. Detail panel будет подключён
-                отдельным шагом.
+                Просмотр обработанных писем, сводок, классификации, вложений и
+                статистики за выбранный период.
               </p>
             </div>
             <div className={styles.configCard}>
@@ -208,12 +207,6 @@ export function DashboardPage() {
             </div>
           </div>
         </header>
-
-        <Alert title="Локальные ограничения MVP" tone="info">
-          Поиск применяется только к уже загруженным страницам. API пока не даёт
-          server-side поиск, фильтр по классу и список mailbox. Фильтр по
-          статусу работает только для писем, detail которых уже есть в кеше.
-        </Alert>
 
         <DashboardFilters onChange={setFilters} value={filters} />
 
