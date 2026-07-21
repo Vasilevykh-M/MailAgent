@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react'
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 
 import styles from './Collapsible.module.css'
@@ -16,7 +17,10 @@ export function Collapsible({
 
   return (
     <details className={classNames} {...props}>
-      <summary>{title}</summary>
+      <summary>
+        <span>{title}</span>
+        <ChevronDown aria-hidden="true" className={styles.icon} size={16} />
+      </summary>
       <div className={styles.body}>{children}</div>
     </details>
   )

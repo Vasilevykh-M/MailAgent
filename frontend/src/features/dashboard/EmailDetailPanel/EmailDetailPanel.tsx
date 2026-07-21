@@ -88,10 +88,22 @@ export function EmailDetailPanel({
   return (
     <div className={styles.detail}>
       <header className={styles.header}>
-        <p className={styles.meta}>
-          {data.from} · {formatDateTime(data.received_at)}
-        </p>
+        <div className={styles.senderBlock}>
+          <span className={styles.eyebrow}>Отправитель</span>
+          <p className={styles.sender}>{data.from}</p>
+        </div>
+        <dl className={styles.messageMeta}>
+          <div>
+            <dt>Получено</dt>
+            <dd>{formatDateTime(data.received_at)}</dd>
+          </div>
+          <div>
+            <dt>Mailbox</dt>
+            <dd>{data.mailbox}</dd>
+          </div>
+        </dl>
         <Button
+          className={styles.rawButton}
           onClick={() =>
             void safelyDownload(() => downloadRawEmail(data.raw_download_url))
           }
@@ -108,7 +120,7 @@ export function EmailDetailPanel({
           </Alert>
         )}
 
-        <Section title="Классификация">
+        <Section className={styles.section} title="Классификация">
           <KeyValueTable
             items={[
               {
@@ -148,17 +160,22 @@ export function EmailDetailPanel({
             ]}
           />
           {data.classification?.reason_ru && (
-            <p className={styles.reason}>{data.classification.reason_ru}</p>
+            <div className={styles.reason}>
+              <span>Основание</span>
+              <p>{data.classification.reason_ru}</p>
+            </div>
           )}
         </Section>
 
-        <Section title="Сводка">
-          <p className={styles.text}>{data.summary || 'Сводка отсутствует.'}</p>
+        <Section className={styles.section} title="Сводка">
+          <p className={styles.summary}>
+            {data.summary || 'Сводка отсутствует.'}
+          </p>
         </Section>
 
-        <Section title="Ключевые факты">
+        <Section className={styles.section} title="Ключевые факты">
           {data.key_facts.length > 0 ? (
-            <ul className={styles.list}>
+            <ul className={styles.factList}>
               {data.key_facts.map((fact) => (
                 <li key={fact}>{fact}</li>
               ))}
@@ -169,7 +186,7 @@ export function EmailDetailPanel({
         </Section>
 
         {data.warnings.length > 0 && (
-          <Section>
+          <Section className={styles.section}>
             <Alert title="Требует внимания" tone="warning">
               <ul className={styles.list}>
                 {data.warnings.map((warning) => (
@@ -180,7 +197,7 @@ export function EmailDetailPanel({
           </Section>
         )}
 
-        <Collapsible title="Вложения">
+        <Collapsible className={styles.collapsible} title="Вложения">
           {data.attachments.length > 0 ? (
             <div className={styles.attachments}>
               {data.attachments.map((attachment) => (
@@ -214,13 +231,13 @@ export function EmailDetailPanel({
           )}
         </Collapsible>
 
-        <Collapsible title="Тело письма">
+        <Collapsible className={styles.collapsible} title="Тело письма">
           <p className={styles.content}>
             {data.content || 'Текст отсутствует.'}
           </p>
         </Collapsible>
 
-        <Collapsible title="Отладка">
+        <Collapsible className={styles.collapsible} title="Отладка">
           <KeyValueTable
             items={[
               {
@@ -257,10 +274,16 @@ export function EmailDetailPanel({
             ]}
           />
           <div className={styles.jsonSections}>
-            <Collapsible title="original_email JSON">
+            <Collapsible
+              className={styles.nestedCollapsible}
+              title="original_email JSON"
+            >
               <JsonViewer value={data.original_email} />
             </Collapsible>
-            <Collapsible title="agent_result JSON">
+            <Collapsible
+              className={styles.nestedCollapsible}
+              title="agent_result JSON"
+            >
               <JsonViewer value={data.agent_result} />
             </Collapsible>
           </div>

@@ -14,10 +14,8 @@
 }
 
 .header {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-2);
+  display: grid;
+  gap: var(--space-1);
 }
 
 .title {
