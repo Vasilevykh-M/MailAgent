@@ -1,26 +1,26 @@
 .alert {
-  padding: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
 }
 
 .info {
-  border-color: rgba(96, 165, 250, 0.28);
+  border-color: rgba(88, 166, 255, 0.32);
   background: var(--color-info-muted);
 }
 
 .success {
-  border-color: rgba(52, 211, 153, 0.28);
+  border-color: rgba(63, 185, 80, 0.32);
   background: var(--color-success-muted);
 }
 
 .warning {
-  border-color: rgba(251, 191, 36, 0.28);
+  border-color: rgba(210, 153, 34, 0.32);
   background: var(--color-warning-muted);
 }
 
 .danger {
-  border-color: rgba(251, 113, 133, 0.28);
+  border-color: rgba(248, 81, 73, 0.32);
   background: var(--color-danger-muted);
 }
 

@@ -83,20 +83,6 @@
   overflow-wrap: anywhere;
 }
 
-.contentGrid {
-  display: grid;
-  align-items: start;
-  gap: var(--space-4);
-  grid-template-columns: 1fr;
-}
-
-.listColumn {
-  display: grid;
-  min-width: 0;
-  gap: var(--space-3);
-  grid-template-columns: 1fr;
-}
-
 @media (max-width: 640px) {
   .container {
     gap: var(--space-4);
@@ -114,15 +100,5 @@
   .statusGroup {
     margin-left: 0;
     justify-content: flex-start;
-  }
-
-  .contentGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (min-width: 1024px) {
-  .listColumn {
-    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
   }
 }

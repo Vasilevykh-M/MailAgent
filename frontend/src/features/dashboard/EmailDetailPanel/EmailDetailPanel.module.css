@@ -1,14 +1,34 @@
+.detail {
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  margin-bottom: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.meta {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .stack,
 .skeletonStack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .section {
-  padding: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-surface-strong);
 }
 
@@ -29,22 +49,17 @@
   margin-bottom: 0;
 }
 
-.classificationGrid {
+.classificationTable {
   display: grid;
-  margin-top: var(--space-3);
-  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   grid-template-columns: 1fr;
+  overflow: hidden;
 }
 
 .metric {
   min-width: 0;
-}
-
-.classificationMetric {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
 }
 
 .metric dt {
@@ -60,13 +75,37 @@
   overflow-wrap: anywhere;
 }
 
-.classificationMetric dd {
-  display: flex;
-  align-items: center;
-  min-height: 24px;
+.classificationTable .metric {
+  display: grid;
+  border-bottom: 1px solid var(--color-border);
+  grid-template-columns: minmax(120px, 0.32fr) minmax(0, 1fr);
 }
 
-.classificationMetric dd > * {
+.classificationTable .metric:last-child {
+  border-bottom: 0;
+}
+
+.classificationTable dt,
+.classificationTable dd {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+.classificationTable dt {
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.classificationTable dd {
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  background: var(--color-surface-strong);
+}
+
+.classificationTable dd > * {
   min-width: 0;
 }
 
@@ -96,18 +135,29 @@
 .attachments {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .attachment {
   display: flex;
-  padding: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-4);
-  background: rgba(15, 23, 42, 0.28);
+  gap: var(--space-3);
+  background: transparent;
+}
+
+.attachmentContent {
+  min-width: 0;
+}
+
+.attachmentHeader {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
 }
 
 .attachmentTitle {
@@ -118,18 +168,55 @@
   overflow-wrap: anywhere;
 }
 
+.attachmentHeader span {
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.attachmentSummary {
+  margin-top: var(--space-2);
+}
+
+.attachmentSummary span,
+.attachmentFacts {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.attachmentFacts {
+  margin: 0;
+  padding-left: var(--space-3);
+}
+
 .technical {
-  padding: var(--space-4);
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-surface-strong);
 }
 
+.collapsible {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-strong);
+}
+
+.collapsible summary,
 .technical summary {
   cursor: pointer;
   color: var(--color-text-muted);
   font-size: 0.875rem;
   font-weight: 700;
+}
+
+.collapsible summary {
+  padding: var(--space-3);
+}
+
+.collapsibleBody {
+  padding: 0 var(--space-3) var(--space-3);
 }
 
 .technical dl {
@@ -149,12 +236,12 @@
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: rgba(15, 23, 42, 0.28);
+  background: var(--color-surface);
 }
 
 .skeletonLarge,
 .skeletonSmall {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-neutral-muted);
 }
 
@@ -167,12 +254,13 @@
 }
 
 @media (min-width: 720px) {
-  .classificationGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .classificationTable .metric {
+    grid-template-columns: minmax(140px, 0.28fr) minmax(0, 1fr);
   }
 }
 
 @media (max-width: 640px) {
+  .header,
   .sectionHeader,
   .attachment {
     flex-direction: column;

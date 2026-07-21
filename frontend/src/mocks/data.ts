@@ -327,6 +327,49 @@ export const mockEmails = [
       },
     ],
   }),
+  buildEmail({
+    recordId: 'e'.repeat(64),
+    uid: '1005',
+    receivedAt: '2026-07-14T11:40:00.000Z',
+    subject: 'Комплект документов по производственной линии',
+    sender: 'line.project@example.test',
+    summary:
+      'Клиент прислал техническое задание и планировку для расчёта производственной линии.',
+    confidence: 0.88,
+    classification: {
+      status: 'classified',
+      class_code: 'PRODUCTION_LINES',
+      class_name_ru: 'Производственные линии',
+      reason_ru:
+        'В письме описана комплексная линия и приложены документы для расчёта.',
+      confidence: 0.88,
+      message_ru: 'Запрос относится к производственным линиям.',
+    },
+    attachments: [
+      {
+        id: '55555555-5555-4555-8555-555555555555',
+        filename: 'technical_task.pdf',
+        contentType: 'application/pdf',
+        summary:
+          'Техническое задание с требованиями к производительности и составу линии.',
+        keyFacts: [
+          'Нужна производительность 1800 изделий в час',
+          'Требуется автоматическая отбраковка',
+        ],
+      },
+      {
+        id: '66666666-6666-4666-8666-666666666666',
+        filename: 'workshop_layout.dwg',
+        contentType: 'application/acad',
+        summary:
+          'Планировка цеха с зонами подвода коммуникаций и ограничениями по габаритам.',
+        keyFacts: [
+          'Доступная длина участка 28 метров',
+          'Есть ограничение по высоте 4.2 метра',
+        ],
+      },
+    ],
+  }),
   ...Array.from({ length: 32 }, (_, index) => {
     const template = classifiedTemplates[index % classifiedTemplates.length]
     const day = 13 - Math.floor(index / 3)

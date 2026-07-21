@@ -1,3 +1,4 @@
+import { Search } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 
 import type { EmailListItem } from '../../../api'
@@ -21,7 +22,9 @@ type EmailListProps = {
   isFetchingNextPage: boolean
   nextCursor: string | null
   selectedId: string | null
+  search: string
   onLoadMore: () => void
+  onSearchChange: (search: string) => void
   onSelect: (recordId: string) => void
 }
 
@@ -33,7 +36,9 @@ export function EmailList({
   isFetchingNextPage,
   nextCursor,
   selectedId,
+  search,
   onLoadMore,
+  onSearchChange,
   onSelect,
 }: EmailListProps) {
   const { isIntersecting, targetRef } =
@@ -117,11 +122,18 @@ export function EmailList({
   }
 
   return (
-    <Card
-      description="Письма за выбранный период."
-      title="Письма"
-      variant="muted"
-    >
+    <Card title="Письма" variant="muted">
+      <label className={styles.searchField}>
+        <span>Поиск по загруженным письмам</span>
+        <div className={styles.searchBox}>
+          <Search aria-hidden="true" size={16} />
+          <input
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Тема, отправитель, summary"
+            value={search}
+          />
+        </div>
+      </label>
       <div className={styles.list}>
         {items.map((item) => (
           <button
