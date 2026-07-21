@@ -10,7 +10,7 @@
 }
 
 .chart {
-  height: 260px;
+  height: 340px;
   min-width: 0;
 }
 
@@ -60,47 +60,6 @@
   font-size: 1rem;
 }
 
-.classLegend {
-  display: grid;
-  margin: var(--space-3) 0 0;
-  padding: 0;
-  gap: var(--space-2);
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-  list-style: none;
-}
-
-.classLegend li {
-  display: grid;
-  align-items: center;
-  gap: var(--space-2);
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-}
-
-.classLegend span {
-  display: inline-flex;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  align-items: center;
-  justify-content: center;
-  color: #082f49;
-  font-size: 0.75rem;
-  font-weight: 800;
-}
-
-.classLegend p {
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.classLegend strong {
-  color: var(--color-text);
-  font-size: 0.8125rem;
-}
-
 .noClassData {
   display: grid;
   height: 100%;
@@ -109,18 +68,14 @@
   font-size: 0.875rem;
 }
 
-@media (min-width: 1080px) {
+@media (min-width: 1180px) {
   .grid {
-    grid-template-columns: 0.8fr 1.2fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
   .chart {
-    height: 220px;
-  }
-
-  .classLegend p {
-    white-space: normal;
+    height: 280px;
   }
 }

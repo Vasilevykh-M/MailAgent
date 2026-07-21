@@ -6,7 +6,7 @@
 
 .sidebar {
   position: sticky;
-  top: 0;
+  top: calc(52px + var(--space-4));
   align-self: start;
 }
 

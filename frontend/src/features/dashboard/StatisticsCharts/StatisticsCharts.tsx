@@ -1,15 +1,4 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 
 import type { StatisticsResponse } from '../../../api'
 import { Card, EmptyState, Skeleton } from '../../../shared'
@@ -17,7 +6,7 @@ import { formatInteger } from '../../../shared'
 import {
   buildClassChartData,
   buildStatusChartData,
-  type ClassChartDatum,
+  type ChartDatum,
 } from './chartData'
 
 import styles from './StatisticsCharts.module.css'
@@ -37,10 +26,10 @@ export function StatisticsCharts({
     return (
       <section className={styles.grid} aria-label="Графики статистики">
         <Card className={styles.chartCard} title="По статусам" variant="muted">
-          <Skeleton height={260} />
+          <Skeleton height={340} />
         </Card>
         <Card className={styles.chartCard} title="По классам" variant="muted">
-          <Skeleton height={260} />
+          <Skeleton height={340} />
         </Card>
       </section>
     )
@@ -71,23 +60,7 @@ export function StatisticsCharts({
         variant="muted"
       >
         <div className={styles.chart}>
-          <ResponsiveContainer height="100%" width="100%">
-            <PieChart>
-              <Pie
-                data={statusData}
-                dataKey="value"
-                innerRadius={54}
-                nameKey="name"
-                outerRadius={82}
-                paddingAngle={3}
-              >
-                {statusData.map((item) => (
-                  <Cell fill={item.color} key={item.name} />
-                ))}
-              </Pie>
-              <Tooltip content={<ChartTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
+          <DonutChart data={statusData} />
         </div>
         <Legend data={statusData} />
       </Card>
@@ -100,54 +73,36 @@ export function StatisticsCharts({
       >
         <div className={styles.chart}>
           {classData.length > 0 ? (
-            <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={classData} layout="vertical" margin={barMargin}>
-                <CartesianGrid
-                  horizontal={false}
-                  stroke="rgba(148, 163, 184, 0.18)"
-                />
-                <XAxis
-                  allowDecimals={false}
-                  axisLine={false}
-                  tickLine={false}
-                  type="number"
-                />
-                <YAxis
-                  axisLine={false}
-                  dataKey="name"
-                  hide
-                  tickLine={false}
-                  type="category"
-                />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                  {classData.map((item) => (
-                    <Cell fill={item.color} key={item.name} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <DonutChart data={classData} />
           ) : (
             <div className={styles.noClassData}>Нет classified-классов</div>
           )}
         </div>
-        {classData.length > 0 && <ClassLegend data={classData} />}
+        {classData.length > 0 && <Legend data={classData} />}
       </Card>
     </section>
   )
 }
 
-function ClassLegend({ data }: { data: ClassChartDatum[] }) {
+function DonutChart({ data }: { data: ChartDatum[] }) {
   return (
-    <ol className={styles.classLegend}>
-      {data.map((item) => (
-        <li key={item.name}>
-          <span style={{ background: item.color }}>{item.shortName}</span>
-          <p>{item.name}</p>
-          <strong>{formatInteger(item.value)}</strong>
-        </li>
-      ))}
-    </ol>
+    <ResponsiveContainer height="100%" width="100%">
+      <PieChart>
+        <Pie
+          data={data}
+          dataKey="value"
+          innerRadius="56%"
+          nameKey="name"
+          outerRadius="82%"
+          paddingAngle={2}
+        >
+          {data.map((item) => (
+            <Cell fill={item.color} key={item.name} />
+          ))}
+        </Pie>
+        <Tooltip content={<ChartTooltip />} />
+      </PieChart>
+    </ResponsiveContainer>
   )
 }
 
@@ -163,8 +118,6 @@ function Legend({ data }: { data: ChartDatum[] }) {
     </ul>
   )
 }
-
-type ChartDatum = ReturnType<typeof buildStatusChartData>[number]
 
 function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
   if (!active || !payload?.length) {
@@ -193,11 +146,4 @@ type ChartTooltipProps = {
       name?: string
     }
   }>
-}
-
-const barMargin = {
-  top: 4,
-  right: 12,
-  bottom: 4,
-  left: 8,
 }

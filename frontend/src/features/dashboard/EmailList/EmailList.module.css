@@ -1,4 +1,6 @@
 .card {
+  --email-list-card-padding: var(--space-5);
+
   display: flex;
   height: 100%;
   min-height: 0;
@@ -25,9 +27,14 @@
 
 .scrollArea {
   flex: 1 1 auto;
+  margin-right: calc(-1 * var(--email-list-card-padding));
+  margin-bottom: calc(-1 * var(--email-list-card-padding));
+  margin-left: calc(-1 * var(--email-list-card-padding));
   min-height: 0;
   overflow: auto;
-  scrollbar-gutter: stable;
+  padding-right: var(--email-list-card-padding);
+  padding-bottom: var(--email-list-card-padding);
+  padding-left: var(--email-list-card-padding);
 }
 
 .sentinel {
@@ -44,11 +51,15 @@
 
 @media (max-width: 1023px) {
   .card {
+    --email-list-card-padding: var(--space-3);
+
     height: auto;
   }
 
   .loadingList,
   .scrollArea {
+    margin: 0;
     overflow: visible;
+    padding: 0;
   }
 }

@@ -1,14 +1,11 @@
 .page {
-  height: 100vh;
+  min-height: 100vh;
   padding: var(--space-page-y) var(--space-page-x);
-  overflow: hidden;
   background: var(--color-bg);
 }
 
 .container {
   display: flex;
-  height: 100%;
-  min-height: 0;
   width: min(100%, var(--container-width));
   margin: 0 auto;
   flex-direction: column;
@@ -16,6 +13,9 @@
 }
 
 .header {
+  position: sticky;
+  z-index: 10;
+  top: 0;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -23,10 +23,7 @@
 }
 
 .content {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: auto;
-  scrollbar-gutter: stable;
+  min-width: 0;
 }
 
 .headerRow {
