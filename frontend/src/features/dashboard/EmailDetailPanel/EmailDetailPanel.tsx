@@ -6,7 +6,18 @@ import {
   downloadRawEmail,
   type EmailDetail,
 } from '../../../api'
-import { Alert, Badge, Button, EmptyState, JsonViewer } from '../../../shared'
+import {
+  Alert,
+  Badge,
+  Button,
+  Collapsible,
+  EmptyState,
+  FileItem,
+  JsonViewer,
+  KeyValueTable,
+  Section,
+  Skeleton,
+} from '../../../shared'
 import {
   formatConfidence,
   formatDateTime,
@@ -48,9 +59,9 @@ export function EmailDetailPanel({
   if (isLoading) {
     return (
       <div className={styles.skeletonStack}>
-        <div className={styles.skeletonLarge} />
-        <div className={styles.skeletonSmall} />
-        <div className={styles.skeletonLarge} />
+        <Skeleton height={140} />
+        <Skeleton height={72} />
+        <Skeleton height={140} />
       </div>
     )
   }
@@ -97,42 +108,55 @@ export function EmailDetailPanel({
           </Alert>
         )}
 
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h3>Классификация</h3>
-          </div>
-          <dl className={styles.classificationTable}>
-            <Metric label="Статус">
-              <Badge
-                tone={getClassificationStatusTone(data.classification?.status)}
-              >
-                {getClassificationStatusLabel(data.classification?.status)}
-              </Badge>
-            </Metric>
-            <Metric label="Класс">
-              {formatNullable(data.classification?.class_name_ru)}
-            </Metric>
-            <Metric label="Код">
-              {formatNullable(data.classification?.class_code)}
-            </Metric>
-            <Metric label="Уверенность">
-              <Badge tone={getConfidenceTone(data.classification?.confidence)}>
-                {formatConfidence(data.classification?.confidence)}
-              </Badge>
-            </Metric>
-          </dl>
+        <Section title="Классификация">
+          <KeyValueTable
+            items={[
+              {
+                key: 'status',
+                label: 'Статус',
+                value: (
+                  <Badge
+                    tone={getClassificationStatusTone(
+                      data.classification?.status,
+                    )}
+                  >
+                    {getClassificationStatusLabel(data.classification?.status)}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'class',
+                label: 'Класс',
+                value: formatNullable(data.classification?.class_name_ru),
+              },
+              {
+                key: 'code',
+                label: 'Код',
+                value: formatNullable(data.classification?.class_code),
+              },
+              {
+                key: 'confidence',
+                label: 'Уверенность',
+                value: (
+                  <Badge
+                    tone={getConfidenceTone(data.classification?.confidence)}
+                  >
+                    {formatConfidence(data.classification?.confidence)}
+                  </Badge>
+                ),
+              },
+            ]}
+          />
           {data.classification?.reason_ru && (
             <p className={styles.reason}>{data.classification.reason_ru}</p>
           )}
-        </section>
+        </Section>
 
-        <section className={styles.section}>
-          <h3>Сводка</h3>
+        <Section title="Сводка">
           <p className={styles.text}>{data.summary || 'Сводка отсутствует.'}</p>
-        </section>
+        </Section>
 
-        <section className={styles.section}>
-          <h3>Ключевые факты</h3>
+        <Section title="Ключевые факты">
           {data.key_facts.length > 0 ? (
             <ul className={styles.list}>
               {data.key_facts.map((fact) => (
@@ -142,10 +166,10 @@ export function EmailDetailPanel({
           ) : (
             <p className={styles.muted}>Ключевые факты не выделены.</p>
           )}
-        </section>
+        </Section>
 
         {data.warnings.length > 0 && (
-          <section className={styles.section}>
+          <Section>
             <Alert title="Требует внимания" tone="warning">
               <ul className={styles.list}>
                 {data.warnings.map((warning) => (
@@ -153,124 +177,95 @@ export function EmailDetailPanel({
                 ))}
               </ul>
             </Alert>
-          </section>
+          </Section>
         )}
 
-        <CollapsibleSection title="Вложения">
+        <Collapsible title="Вложения">
           {data.attachments.length > 0 ? (
             <div className={styles.attachments}>
               {data.attachments.map((attachment) => (
-                <article className={styles.attachment} key={attachment.id}>
-                  <div className={styles.attachmentContent}>
-                    <div className={styles.attachmentHeader}>
-                      <p className={styles.attachmentTitle}>
-                        {attachment.filename}
-                      </p>
-                      <span>
-                        {attachment.detected_content_type} ·{' '}
-                        {formatFileSize(attachment.size)}
-                      </span>
-                    </div>
-                    {attachment.summary && (
-                      <div className={styles.attachmentSummary}>
-                        <span>{attachment.summary}</span>
-                      </div>
-                    )}
-                    {attachment.key_facts.length > 0 && (
-                      <div className={styles.attachmentSummary}>
-                        <p>Ключевые факты</p>
-                        <ul className={styles.attachmentFacts}>
-                          {attachment.key_facts.map((fact) => (
-                            <li key={fact}>{fact}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    onClick={() =>
-                      void safelyDownload(() =>
-                        downloadAttachment(
-                          attachment.download_url,
-                          attachment.safe_filename,
-                        ),
-                      )
-                    }
-                    variant="secondary"
-                  >
-                    <Download aria-hidden="true" size={16} />
-                    Скачать
-                  </Button>
-                </article>
+                <FileItem
+                  actions={
+                    <Button
+                      onClick={() =>
+                        void safelyDownload(() =>
+                          downloadAttachment(
+                            attachment.download_url,
+                            attachment.safe_filename,
+                          ),
+                        )
+                      }
+                      variant="secondary"
+                    >
+                      <Download aria-hidden="true" size={16} />
+                      Скачать
+                    </Button>
+                  }
+                  description={attachment.summary}
+                  facts={attachment.key_facts}
+                  key={attachment.id}
+                  meta={`${attachment.detected_content_type} · ${formatFileSize(attachment.size)}`}
+                  title={attachment.filename}
+                />
               ))}
             </div>
           ) : (
             <p className={styles.muted}>Вложений нет.</p>
           )}
-        </CollapsibleSection>
+        </Collapsible>
 
-        <CollapsibleSection title="Тело письма">
+        <Collapsible title="Тело письма">
           <p className={styles.content}>
             {data.content || 'Текст отсутствует.'}
           </p>
-        </CollapsibleSection>
+        </Collapsible>
 
-        <details className={styles.technical}>
-          <summary>Отладка</summary>
-          <dl>
-            <Metric label="Record ID">{data.record_id}</Metric>
-            <Metric label="UID">{data.uid}</Metric>
-            <Metric label="Mailbox">{data.mailbox}</Metric>
-            <Metric label="Message ID">
-              {formatNullable(data.message_id)}
-            </Metric>
-            <Metric label="Pipeline">{data.pipeline_version}</Metric>
-            <Metric label="Generation">{data.processing_generation}</Metric>
-            <Metric label="Processed">
-              {formatDateTime(data.processed_at)}
-            </Metric>
-          </dl>
+        <Collapsible title="Отладка">
+          <KeyValueTable
+            items={[
+              {
+                key: 'record_id',
+                label: 'Record ID',
+                value: data.record_id,
+              },
+              { key: 'uid', label: 'UID', value: data.uid },
+              {
+                key: 'mailbox',
+                label: 'Mailbox',
+                value: data.mailbox,
+              },
+              {
+                key: 'message_id',
+                label: 'Message ID',
+                value: formatNullable(data.message_id),
+              },
+              {
+                key: 'pipeline',
+                label: 'Pipeline',
+                value: data.pipeline_version,
+              },
+              {
+                key: 'generation',
+                label: 'Generation',
+                value: data.processing_generation,
+              },
+              {
+                key: 'processed',
+                label: 'Processed',
+                value: formatDateTime(data.processed_at),
+              },
+            ]}
+          />
           <div className={styles.jsonSections}>
-            <details>
-              <summary>original_email JSON</summary>
+            <Collapsible title="original_email JSON">
               <JsonViewer value={data.original_email} />
-            </details>
-            <details>
-              <summary>agent_result JSON</summary>
+            </Collapsible>
+            <Collapsible title="agent_result JSON">
               <JsonViewer value={data.agent_result} />
-            </details>
+            </Collapsible>
           </div>
-        </details>
+        </Collapsible>
       </div>
-    </div>
-  )
-}
-
-type CollapsibleSectionProps = {
-  title: string
-  children: React.ReactNode
-}
-
-function CollapsibleSection({ title, children }: CollapsibleSectionProps) {
-  return (
-    <details className={styles.collapsible}>
-      <summary>{title}</summary>
-      <div className={styles.collapsibleBody}>{children}</div>
-    </details>
-  )
-}
-
-type MetricProps = {
-  className?: string
-  label: string
-  children: React.ReactNode
-}
-
-function Metric({ className = '', label, children }: MetricProps) {
-  return (
-    <div className={`${styles.metric} ${className}`}>
-      <dt>{label}</dt>
-      <dd>{children}</dd>
     </div>
   )
 }

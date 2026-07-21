@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import { useStatistics } from '../../../api'
-import { dateInputToIsoNextDay, dateInputToIsoStart } from '../../../shared'
+import {
+  dateInputToIsoNextDay,
+  dateInputToIsoStart,
+  PageShell,
+  TabsNav,
+} from '../../../shared'
 import { DashboardFilters, defaultFilters } from '../DashboardFilters'
 import { HealthIndicator } from '../HealthIndicator'
 import { StatisticsCards } from '../StatisticsCards'
 import { StatisticsCharts } from '../StatisticsCharts'
-
-import styles from './StatisticsPage.module.css'
 
 export function StatisticsPage() {
   const [filters, setFilters] = useState(defaultFilters)
@@ -23,46 +25,36 @@ export function StatisticsPage() {
   const statistics = useStatistics(apiParams)
 
   return (
-    <main className={styles.page}>
-      <div className={styles.container}>
-        <header className={styles.hero}>
-          <div className={styles.headerRow}>
-            <h1 className={styles.brand}>Mail Agent</h1>
-            <nav className={styles.nav} aria-label="Основная навигация">
-              <Link className={styles.navLink} to="/">
-                Письма
-              </Link>
-              <Link
-                className={`${styles.navLink} ${styles.activeNavLink}`}
-                to="/statistics"
-              >
-                Статистика
-              </Link>
-            </nav>
-            <div className={styles.statusGroup}>
-              <HealthIndicator />
-            </div>
-          </div>
-        </header>
-
-        <DashboardFilters
-          onChange={setFilters}
-          showListFilters={false}
-          value={filters}
+    <PageShell
+      actions={<HealthIndicator />}
+      navigation={
+        <TabsNav
+          ariaLabel="Основная навигация"
+          items={[
+            { label: 'Письма', to: '/' },
+            { active: true, label: 'Статистика', to: '/statistics' },
+          ]}
         />
+      }
+      title="Mail Agent"
+    >
+      <DashboardFilters
+        onChange={setFilters}
+        showListFilters={false}
+        value={filters}
+      />
 
-        <StatisticsCards
-          data={statistics.data}
-          isError={statistics.isError}
-          isLoading={statistics.isLoading}
-        />
+      <StatisticsCards
+        data={statistics.data}
+        isError={statistics.isError}
+        isLoading={statistics.isLoading}
+      />
 
-        <StatisticsCharts
-          data={statistics.data}
-          isError={statistics.isError}
-          isLoading={statistics.isLoading}
-        />
-      </div>
-    </main>
+      <StatisticsCharts
+        data={statistics.data}
+        isError={statistics.isError}
+        isLoading={statistics.isLoading}
+      />
+    </PageShell>
   )
 }

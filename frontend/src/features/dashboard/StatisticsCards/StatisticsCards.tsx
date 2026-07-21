@@ -1,5 +1,5 @@
 import type { StatisticsResponse } from '../../../api'
-import { Card, EmptyState } from '../../../shared'
+import { Card, EmptyState, Skeleton } from '../../../shared'
 import { formatInteger } from '../../../shared'
 
 import styles from './StatisticsCards.module.css'
@@ -32,8 +32,8 @@ export function StatisticsCards({
       <section className={styles.grid} aria-label="Статистика">
         {Array.from({ length: 4 }).map((_, index) => (
           <Card className={styles.metric} key={index} variant="muted">
-            <div className={styles.skeletonTitle} />
-            <div className={styles.skeletonValue} />
+            <Skeleton height={12} radius="sm" width={96} />
+            <Skeleton height={28} radius="sm" width={140} />
           </Card>
         ))}
       </section>

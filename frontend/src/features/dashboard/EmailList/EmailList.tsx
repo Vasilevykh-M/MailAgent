@@ -2,7 +2,15 @@ import { Search } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 
 import type { EmailListItem } from '../../../api'
-import { Badge, Card, EmptyState } from '../../../shared'
+import {
+  Badge,
+  Card,
+  DataList,
+  EmptyState,
+  Field,
+  Input,
+  Skeleton,
+} from '../../../shared'
 import {
   formatConfidence,
   formatDateTime,
@@ -92,7 +100,7 @@ export function EmailList({
       <Card title="Письма" variant="muted">
         <div className={styles.loadingList}>
           {Array.from({ length: 5 }).map((_, index) => (
-            <div className={styles.skeletonRow} key={index} />
+            <Skeleton height={76} key={index} />
           ))}
         </div>
       </Card>
@@ -123,42 +131,38 @@ export function EmailList({
 
   return (
     <Card title="Письма" variant="muted">
-      <label className={styles.searchField}>
-        <span>Поиск по загруженным письмам</span>
-        <div className={styles.searchBox}>
-          <Search aria-hidden="true" size={16} />
-          <input
+      <div className={styles.searchField}>
+        <Field label="Поиск по загруженным письмам">
+          <Input
+            leftSlot={<Search aria-hidden="true" size={16} />}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Тема, отправитель, summary"
             value={search}
           />
-        </div>
-      </label>
-      <div className={styles.list}>
+        </Field>
+      </div>
+      <DataList>
         {items.map((item) => (
-          <button
-            aria-pressed={item.id === selectedId}
-            className={`${styles.row} ${item.id === selectedId ? styles.selected : ''}`}
-            key={item.id}
-            onClick={() => onSelect(item.id)}
-            type="button"
-          >
-            <div className={styles.rowHeader}>
-              <h3>{item.subject || 'Без темы'}</h3>
+          <DataList.Item
+            badge={
               <Badge tone={getConfidenceTone(item.confidence)}>
                 {formatConfidence(item.confidence)}
               </Badge>
-            </div>
-            <p className={styles.preview}>{item.summary_preview}</p>
-            <div className={styles.meta}>
-              <span>{item.from}</span>
-              <span>{formatDateTime(item.received_at)}</span>
-              <span>{item.attachment_count} влож.</span>
-            </div>
-          </button>
+            }
+            description={item.summary_preview}
+            key={item.id}
+            meta={[
+              item.from,
+              formatDateTime(item.received_at),
+              `${item.attachment_count} влож.`,
+            ]}
+            onClick={() => onSelect(item.id)}
+            selected={item.id === selectedId}
+            title={item.subject || 'Без темы'}
+          />
         ))}
         <div aria-hidden="true" className={styles.sentinel} ref={targetRef} />
-      </div>
+      </DataList>
       {hasNextPage && (
         <p className={styles.autoLoadStatus}>
           {isFetchingNextPage ? 'Загружаем письма…' : 'Прокрутите ниже'}

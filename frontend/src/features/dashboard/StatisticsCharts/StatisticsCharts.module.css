@@ -101,12 +101,6 @@
   font-size: 0.8125rem;
 }
 
-.skeletonChart {
-  height: 260px;
-  border-radius: var(--radius-md);
-  background: var(--color-neutral-muted);
-}
-
 .noClassData {
   display: grid;
   height: 100%;

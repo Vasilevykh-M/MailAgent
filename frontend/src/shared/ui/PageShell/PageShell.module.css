@@ -12,7 +12,7 @@
   gap: var(--space-4);
 }
 
-.hero {
+.header {
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -25,42 +25,6 @@
   gap: var(--space-4);
 }
 
-.statusGroup {
-  margin-left: auto;
-  display: inline-flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
-.nav {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.navLink {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-  font-weight: 650;
-  text-decoration: none;
-}
-
-.navLink:hover {
-  background: var(--color-surface-strong);
-  color: var(--color-text);
-}
-
-.activeNavLink {
-  background: var(--color-surface-strong);
-  color: var(--color-text);
-}
-
 .brand {
   flex-shrink: 0;
   margin: 0;
@@ -70,17 +34,12 @@
   letter-spacing: -0.01em;
 }
 
-.eyebrow,
-.heroContent,
-.title,
-.description,
-.configCard {
-  display: none;
-}
-
-.configCard span {
-  color: var(--color-text);
-  overflow-wrap: anywhere;
+.actions {
+  margin-left: auto;
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 @media (max-width: 640px) {
@@ -88,7 +47,7 @@
     gap: var(--space-4);
   }
 
-  .hero {
+  .header {
     padding: var(--space-3);
   }
 
@@ -97,7 +56,7 @@
     flex-direction: column;
   }
 
-  .statusGroup {
+  .actions {
     margin-left: 0;
     justify-content: flex-start;
   }

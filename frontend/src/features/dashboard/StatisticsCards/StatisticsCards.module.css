@@ -5,8 +5,10 @@
 }
 
 .metric {
+  display: grid;
   min-width: 0;
   padding: var(--space-3);
+  gap: var(--space-3);
   box-shadow: none;
 }
 
@@ -25,23 +27,6 @@
   letter-spacing: -0.04em;
   line-height: 1.12;
   overflow-wrap: anywhere;
-}
-
-.skeletonTitle,
-.skeletonValue {
-  border-radius: 999px;
-  background: var(--color-neutral-muted);
-}
-
-.skeletonTitle {
-  width: 96px;
-  height: 12px;
-}
-
-.skeletonValue {
-  width: 140px;
-  height: 28px;
-  margin-top: var(--space-3);
 }
 
 @media (min-width: 720px) {

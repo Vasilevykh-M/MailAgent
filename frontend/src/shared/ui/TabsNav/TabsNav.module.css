@@ -1,0 +1,27 @@
+.nav {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.link {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.link:hover {
+  background: var(--color-surface-strong);
+  color: var(--color-text);
+}
+
+.active {
+  background: var(--color-surface-strong);
+  color: var(--color-text);
+}

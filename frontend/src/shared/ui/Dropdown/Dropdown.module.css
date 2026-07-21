@@ -1,0 +1,26 @@
+.root {
+  position: relative;
+}
+
+.content {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--space-1));
+  display: grid;
+  width: max-content;
+  min-width: 180px;
+  max-width: min(320px, calc(100vw - var(--space-page-x) * 2));
+  padding: var(--space-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgba(1, 4, 9, 0.28);
+}
+
+.start {
+  left: 0;
+}
+
+.end {
+  right: 0;
+}

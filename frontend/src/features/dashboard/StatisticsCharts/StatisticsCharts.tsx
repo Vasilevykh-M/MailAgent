@@ -12,7 +12,7 @@ import {
 } from 'recharts'
 
 import type { StatisticsResponse } from '../../../api'
-import { Card, EmptyState } from '../../../shared'
+import { Card, EmptyState, Skeleton } from '../../../shared'
 import { formatInteger } from '../../../shared'
 import {
   buildClassChartData,
@@ -37,10 +37,10 @@ export function StatisticsCharts({
     return (
       <section className={styles.grid} aria-label="Графики статистики">
         <Card className={styles.chartCard} title="По статусам" variant="muted">
-          <div className={styles.skeletonChart} />
+          <Skeleton height={260} />
         </Card>
         <Card className={styles.chartCard} title="По классам" variant="muted">
-          <div className={styles.skeletonChart} />
+          <Skeleton height={260} />
         </Card>
       </section>
     )

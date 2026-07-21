@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import {
   queryKeys,
@@ -9,8 +9,13 @@ import {
   type EmailDetail,
   type EmailListItem,
 } from '../../../api'
-import { dateInputToIsoNextDay, dateInputToIsoStart } from '../../../shared'
-import { Modal } from '../../../shared'
+import {
+  dateInputToIsoNextDay,
+  dateInputToIsoStart,
+  Modal,
+  PageShell,
+  TabsNav,
+} from '../../../shared'
 import {
   DashboardFilters,
   defaultFilters,
@@ -147,65 +152,55 @@ export function DashboardPage() {
   }, [navigate])
 
   return (
-    <main className={styles.page}>
-      <div className={styles.container}>
-        <header className={styles.hero}>
-          <div className={styles.headerRow}>
-            <h1 className={styles.brand}>Mail Agent</h1>
-            <nav className={styles.nav} aria-label="Основная навигация">
-              <Link
-                className={`${styles.navLink} ${styles.activeNavLink}`}
-                to="/"
-              >
-                Письма
-              </Link>
-              <Link className={styles.navLink} to="/statistics">
-                Статистика
-              </Link>
-            </nav>
-            <div className={styles.statusGroup}>
-              <HealthIndicator />
-            </div>
-          </div>
-        </header>
-
-        <div className={styles.contentGrid}>
-          <div className={styles.listColumn}>
-            <DashboardFilters
-              onChange={setFilters}
-              placement="sidebar"
-              value={filters}
-            />
-            <EmailList
-              hasNextPage={emails.hasNextPage}
-              isError={emails.isError}
-              isFetchingNextPage={emails.isFetchingNextPage}
-              isLoading={emails.isLoading}
-              items={emailItems}
-              nextCursor={nextEmailCursor}
-              onLoadMore={loadMoreEmails}
-              onSearchChange={setSearch}
-              onSelect={selectEmail}
-              search={search}
-              selectedId={recordId}
-            />
-          </div>
+    <PageShell
+      actions={<HealthIndicator />}
+      navigation={
+        <TabsNav
+          ariaLabel="Основная навигация"
+          items={[
+            { active: true, label: 'Письма', to: '/' },
+            { label: 'Статистика', to: '/statistics' },
+          ]}
+        />
+      }
+      title="Mail Agent"
+    >
+      <div className={styles.contentGrid}>
+        <div className={styles.listColumn}>
+          <DashboardFilters
+            onChange={setFilters}
+            placement="sidebar"
+            value={filters}
+          />
+          <EmailList
+            hasNextPage={emails.hasNextPage}
+            isError={emails.isError}
+            isFetchingNextPage={emails.isFetchingNextPage}
+            isLoading={emails.isLoading}
+            items={emailItems}
+            nextCursor={nextEmailCursor}
+            onLoadMore={loadMoreEmails}
+            onSearchChange={setSearch}
+            onSelect={selectEmail}
+            search={search}
+            selectedId={recordId}
+          />
         </div>
-
-        {recordId && (
-          <Modal
-            onClose={closeEmailModal}
-            title={emailDetail.data?.subject || 'Письмо'}
-          >
-            <EmailDetailPanel
-              data={emailDetail.data}
-              isError={emailDetail.isError}
-              isLoading={emailDetail.isLoading}
-              isPlaceholder={false}
-            />
-          </Modal>
-        )}
       </div>
-    </main>
+
+      {recordId && (
+        <Modal
+          onClose={closeEmailModal}
+          title={emailDetail.data?.subject || 'Письмо'}
+        >
+          <EmailDetailPanel
+            data={emailDetail.data}
+            isError={emailDetail.isError}
+            isLoading={emailDetail.isLoading}
+            isPlaceholder={false}
+          />
+        </Modal>
+      )}
+    </PageShell>
   )
 }

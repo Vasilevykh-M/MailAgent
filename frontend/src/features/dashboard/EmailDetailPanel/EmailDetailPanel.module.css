@@ -25,90 +25,6 @@
   gap: var(--space-3);
 }
 
-.section {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-strong);
-}
-
-.sectionHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.section h3 {
-  margin: 0 0 var(--space-3);
-  color: var(--color-text);
-  font-size: 0.9375rem;
-}
-
-.sectionHeader h3 {
-  margin-bottom: 0;
-}
-
-.classificationTable {
-  display: grid;
-  margin: var(--space-3) 0 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  grid-template-columns: 1fr;
-  overflow: hidden;
-}
-
-.metric {
-  min-width: 0;
-}
-
-.metric dt {
-  color: var(--color-text-subtle);
-  font-size: 0.75rem;
-  font-weight: 650;
-}
-
-.metric dd {
-  margin: var(--space-1) 0 0;
-  color: var(--color-text);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.classificationTable .metric {
-  display: grid;
-  border-bottom: 1px solid var(--color-border);
-  grid-template-columns: minmax(120px, 0.32fr) minmax(0, 1fr);
-}
-
-.classificationTable .metric:last-child {
-  border-bottom: 0;
-}
-
-.classificationTable dt,
-.classificationTable dd {
-  display: flex;
-  min-height: 34px;
-  align-items: center;
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-}
-
-.classificationTable dt {
-  border-right: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.classificationTable dd {
-  color: var(--color-text);
-  font-size: 0.8125rem;
-  background: var(--color-surface-strong);
-}
-
-.classificationTable dd > * {
-  min-width: 0;
-}
-
 .reason,
 .text,
 .content,
@@ -138,135 +54,15 @@
   gap: var(--space-2);
 }
 
-.attachment {
-  display: flex;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  background: transparent;
-}
-
-.attachmentContent {
-  min-width: 0;
-}
-
-.attachmentHeader {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-2);
-}
-
-.attachmentTitle {
-  margin: 0;
-  color: var(--color-text);
-  font-size: 0.875rem;
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-
-.attachmentHeader span {
-  color: var(--color-text-subtle);
-  font-size: 0.75rem;
-  line-height: 1.5;
-}
-
-.attachmentSummary {
-  margin-top: var(--space-2);
-}
-
-.attachmentSummary span,
-.attachmentFacts {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-  line-height: 1.6;
-}
-
-.attachmentFacts {
-  margin: 0;
-  padding-left: var(--space-3);
-}
-
-.technical {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-strong);
-}
-
-.collapsible {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-strong);
-}
-
-.collapsible summary,
-.technical summary {
-  cursor: pointer;
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-  font-weight: 700;
-}
-
-.collapsible summary {
-  padding: var(--space-3);
-}
-
-.collapsibleBody {
-  padding: 0 var(--space-3) var(--space-3);
-}
-
-.technical dl {
-  display: grid;
-  margin: var(--space-4) 0 0;
-  gap: var(--space-3);
-}
-
 .jsonSections {
   display: flex;
   margin-top: var(--space-4);
   flex-direction: column;
-  gap: var(--space-3);
-}
-
-.jsonSections details {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-
-.skeletonLarge,
-.skeletonSmall {
-  border-radius: var(--radius-md);
-  background: var(--color-neutral-muted);
-}
-
-.skeletonLarge {
-  height: 140px;
-}
-
-.skeletonSmall {
-  height: 72px;
-}
-
-@media (min-width: 720px) {
-  .classificationTable .metric {
-    grid-template-columns: minmax(140px, 0.28fr) minmax(0, 1fr);
-  }
+  gap: var(--space-2);
 }
 
 @media (max-width: 640px) {
-  .header,
-  .sectionHeader,
-  .attachment {
+  .header {
     flex-direction: column;
-  }
-
-  .attachment button {
-    width: 100%;
   }
 }

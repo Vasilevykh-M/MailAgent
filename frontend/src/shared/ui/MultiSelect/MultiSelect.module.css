@@ -1,0 +1,21 @@
+.trigger {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.triggerLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triggerIcon {
+  flex: 0 0 auto;
+  color: var(--color-text-subtle);
+}
+
+.menu {
+  width: 100%;
+  min-width: 100%;
+}

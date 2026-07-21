@@ -1,0 +1,26 @@
+.section {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-strong);
+}
+
+.header {
+  display: flex;
+  margin-bottom: var(--space-3);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.header h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+}
+
+@media (max-width: 640px) {
+  .header {
+    flex-direction: column;
+  }
+}

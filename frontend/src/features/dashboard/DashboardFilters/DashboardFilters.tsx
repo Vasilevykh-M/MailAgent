@@ -1,5 +1,7 @@
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 
+import { Field, Input, MultiSelect } from '../../../shared'
+
 import styles from './DashboardFilters.module.css'
 
 type AttachmentFilterValue = 'with' | 'without'
@@ -17,11 +19,6 @@ export type DashboardFiltersValue = {
   attachmentFilter: AttachmentFilterValue[]
   confidenceFilter: ConfidenceFilterValue[]
   statusFilter: StatusFilterValue[]
-}
-
-type FilterOption<Value extends string> = {
-  label: string
-  value: Value
 }
 
 type DashboardFiltersProps = {
@@ -49,9 +46,8 @@ export function DashboardFilters({
         <div className={styles.group}>
           <p className={styles.groupTitle}>Период</p>
           <div className={styles.groupGrid}>
-            <label className={styles.field}>
-              <span>С даты</span>
-              <input
+            <Field label="С даты">
+              <Input
                 onChange={(event) =>
                   onChange({
                     ...value,
@@ -61,10 +57,9 @@ export function DashboardFilters({
                 type="date"
                 value={value.fromDate}
               />
-            </label>
-            <label className={styles.field}>
-              <span>По дату</span>
-              <input
+            </Field>
+            <Field label="По дату">
+              <Input
                 onChange={(event) =>
                   onChange({
                     ...value,
@@ -74,10 +69,9 @@ export function DashboardFilters({
                 type="date"
                 value={value.toDate}
               />
-            </label>
-            <label className={styles.field}>
-              <span>Mailbox</span>
-              <input
+            </Field>
+            <Field label="Mailbox">
+              <Input
                 onChange={(event) =>
                   onChange({
                     ...value,
@@ -87,65 +81,68 @@ export function DashboardFilters({
                 placeholder="INBOX"
                 value={value.mailbox}
               />
-            </label>
+            </Field>
           </div>
         </div>
         {showListFilters && (
           <div className={styles.group}>
             <p className={styles.groupTitle}>Список</p>
             <div className={styles.groupGrid}>
-              <CheckboxDropdown
-                label="Вложения"
-                onChange={(attachmentFilter) =>
-                  onChange({ ...value, attachmentFilter })
-                }
-                options={[
-                  { label: 'С вложениями', value: 'with' },
-                  { label: 'Без вложений', value: 'without' },
-                ]}
-                placeholder="Все"
-                value={value.attachmentFilter}
-              />
-              <CheckboxDropdown
-                label="Уверенность"
-                onChange={(confidenceFilter) =>
-                  onChange({ ...value, confidenceFilter })
-                }
-                options={[
-                  { label: 'Высокая', value: 'high' },
-                  { label: 'Средняя', value: 'medium' },
-                  { label: 'Низкая', value: 'low' },
-                  { label: 'Нет оценки', value: 'none' },
-                ]}
-                placeholder="Любая"
-                value={value.confidenceFilter}
-              />
-              <CheckboxDropdown
-                label="Статус"
-                onChange={(statusFilter) =>
-                  onChange({ ...value, statusFilter })
-                }
-                options={[
-                  {
-                    label: 'Классифицировано',
-                    value: 'classified',
-                  },
-                  {
-                    label: 'Новый проект',
-                    value: 'new_project',
-                  },
-                  {
-                    label: 'Ручная проверка',
-                    value: 'manual_review',
-                  },
-                  {
-                    label: 'Без данных статуса',
-                    value: 'uncached',
-                  },
-                ]}
-                placeholder="Все"
-                value={value.statusFilter}
-              />
+              <Field label="Вложения">
+                <MultiSelect
+                  onChange={(attachmentFilter) =>
+                    onChange({ ...value, attachmentFilter })
+                  }
+                  options={[
+                    { label: 'С вложениями', value: 'with' },
+                    { label: 'Без вложений', value: 'without' },
+                  ]}
+                  placeholder="Все"
+                  value={value.attachmentFilter}
+                />
+              </Field>
+              <Field label="Уверенность">
+                <MultiSelect
+                  onChange={(confidenceFilter) =>
+                    onChange({ ...value, confidenceFilter })
+                  }
+                  options={[
+                    { label: 'Высокая', value: 'high' },
+                    { label: 'Средняя', value: 'medium' },
+                    { label: 'Низкая', value: 'low' },
+                    { label: 'Нет оценки', value: 'none' },
+                  ]}
+                  placeholder="Любая"
+                  value={value.confidenceFilter}
+                />
+              </Field>
+              <Field label="Статус">
+                <MultiSelect
+                  onChange={(statusFilter) =>
+                    onChange({ ...value, statusFilter })
+                  }
+                  options={[
+                    {
+                      label: 'Классифицировано',
+                      value: 'classified',
+                    },
+                    {
+                      label: 'Новый проект',
+                      value: 'new_project',
+                    },
+                    {
+                      label: 'Ручная проверка',
+                      value: 'manual_review',
+                    },
+                    {
+                      label: 'Без данных статуса',
+                      value: 'uncached',
+                    },
+                  ]}
+                  placeholder="Все"
+                  value={value.statusFilter}
+                />
+              </Field>
             </div>
           </div>
         )}
@@ -174,60 +171,5 @@ export function DashboardFilters({
       </summary>
       {content}
     </details>
-  )
-}
-
-type CheckboxDropdownProps<Value extends string> = {
-  label: string
-  options: FilterOption<Value>[]
-  placeholder: string
-  value: Value[]
-  onChange: (value: Value[]) => void
-}
-
-function CheckboxDropdown<Value extends string>({
-  label,
-  options,
-  placeholder,
-  value,
-  onChange,
-}: CheckboxDropdownProps<Value>) {
-  const selectedLabels = options
-    .filter((option) => value.includes(option.value))
-    .map((option) => option.label)
-  const summary =
-    selectedLabels.length > 0 ? selectedLabels.join(', ') : placeholder
-
-  function toggle(optionValue: Value) {
-    if (value.includes(optionValue)) {
-      onChange(value.filter((selected) => selected !== optionValue))
-      return
-    }
-
-    onChange([...value, optionValue])
-  }
-
-  return (
-    <div className={styles.field}>
-      <span>{label}</span>
-      <details className={styles.dropdown}>
-        <summary className={styles.dropdownSummary}>
-          <span>{summary}</span>
-          <ChevronDown aria-hidden="true" size={16} />
-        </summary>
-        <div className={styles.dropdownMenu}>
-          {options.map((option) => (
-            <label className={styles.checkboxOption} key={option.value}>
-              <input
-                checked={value.includes(option.value)}
-                onChange={() => toggle(option.value)}
-                type="checkbox"
-              />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </div>
-      </details>
-    </div>
   )
 }
