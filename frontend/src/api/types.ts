@@ -35,7 +35,7 @@ export type EmailListParams = {
 }
 
 export type StatisticsParams = {
-  from: string
-  to: string
+  from: string | null
+  to: string | null
   mailbox?: string | null
 }

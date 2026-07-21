@@ -66,12 +66,21 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  overflow: hidden;
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+#root {
+  height: 100%;
 }
 
 button,

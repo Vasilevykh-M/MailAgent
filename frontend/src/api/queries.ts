@@ -30,6 +30,7 @@ export function useStatistics(params: StatisticsParams) {
   return useQuery({
     queryKey: queryKeys.statistics.detail(params),
     queryFn: ({ signal }) => getStatistics(params, signal),
+    enabled: Boolean(params.from && params.to),
   })
 }
 

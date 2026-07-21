@@ -14,12 +14,40 @@ export function formatDateForInput(value: Date): string {
   return format(value, 'yyyy-MM-dd')
 }
 
-export function dateInputToIsoStart(value: string): string {
-  return new Date(`${value}T00:00:00.000Z`).toISOString()
+export function formatDateInputDisplay(value: string): string {
+  const [year, month, day] = value.split('-')
+
+  if (!year || !month || !day) {
+    return value
+  }
+
+  return `${day}.${month}.${year}`
 }
 
-export function dateInputToIsoNextDay(value: string): string {
+export function dateInputToIsoStart(value: string): string | null {
+  if (!value) {
+    return null
+  }
+
   const date = new Date(`${value}T00:00:00.000Z`)
+
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return date.toISOString()
+}
+
+export function dateInputToIsoNextDay(value: string): string | null {
+  if (!value) {
+    return null
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`)
+
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
 
   date.setUTCDate(date.getUTCDate() + 1)
 

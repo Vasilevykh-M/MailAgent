@@ -1,11 +1,33 @@
+.card {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.card > header {
+  flex: 0 0 auto;
+}
+
 .searchField {
+  flex: 0 0 auto;
   margin-bottom: var(--space-3);
 }
 
 .loadingList {
   display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+.scrollArea {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .sentinel {
@@ -18,4 +40,15 @@
   font-size: 0.8125rem;
   line-height: 1.6;
   text-align: center;
+}
+
+@media (max-width: 1023px) {
+  .card {
+    height: auto;
+  }
+
+  .loadingList,
+  .scrollArea {
+    overflow: visible;
+  }
 }

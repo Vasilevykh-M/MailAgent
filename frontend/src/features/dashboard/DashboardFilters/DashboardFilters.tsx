@@ -1,6 +1,6 @@
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 
-import { Field, Input, MultiSelect } from '../../../shared'
+import { DateRangePicker, Field, Input, MultiSelect } from '../../../shared'
 
 import styles from './DashboardFilters.module.css'
 
@@ -44,33 +44,9 @@ export function DashboardFilters({
       </div>
       <div className={styles.body}>
         <div className={styles.group}>
-          <p className={styles.groupTitle}>Период</p>
+          <p className={styles.groupTitle}>Mailbox</p>
           <div className={styles.groupGrid}>
-            <Field label="С даты">
-              <Input
-                onChange={(event) =>
-                  onChange({
-                    ...value,
-                    fromDate: event.target.value,
-                  })
-                }
-                type="date"
-                value={value.fromDate}
-              />
-            </Field>
-            <Field label="По дату">
-              <Input
-                onChange={(event) =>
-                  onChange({
-                    ...value,
-                    toDate: event.target.value,
-                  })
-                }
-                type="date"
-                value={value.toDate}
-              />
-            </Field>
-            <Field label="Mailbox">
+            <Field label="Почтовый ящик">
               <Input
                 onChange={(event) =>
                   onChange({
@@ -80,6 +56,26 @@ export function DashboardFilters({
                 }
                 placeholder="INBOX"
                 value={value.mailbox}
+              />
+            </Field>
+          </div>
+        </div>
+        <div className={styles.group}>
+          <p className={styles.groupTitle}>Период</p>
+          <div className={styles.groupGrid}>
+            <Field label="Диапазон">
+              <DateRangePicker
+                onChange={(range) =>
+                  onChange({
+                    ...value,
+                    fromDate: range.from,
+                    toDate: range.to,
+                  })
+                }
+                value={{
+                  from: value.fromDate,
+                  to: value.toDate,
+                }}
               />
             </Field>
           </div>

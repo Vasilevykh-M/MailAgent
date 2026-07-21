@@ -5,6 +5,8 @@
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
   align-self: start;
 }
 
@@ -106,6 +108,10 @@
 }
 
 @media (max-width: 640px) {
+  .sidebar {
+    position: static;
+  }
+
   .summary {
     align-items: flex-start;
     padding-block: var(--space-2);

@@ -97,7 +97,7 @@ export function EmailList({
 
   if (isLoading) {
     return (
-      <Card title="Письма" variant="muted">
+      <Card className={styles.card} title="Письма" variant="muted">
         <div className={styles.loadingList}>
           {Array.from({ length: 5 }).map((_, index) => (
             <Skeleton height={76} key={index} />
@@ -109,7 +109,7 @@ export function EmailList({
 
   if (isError) {
     return (
-      <Card title="Письма" variant="muted">
+      <Card className={styles.card} title="Письма" variant="muted">
         <EmptyState
           description="Не удалось получить список писем из Results API."
           title="Список недоступен"
@@ -118,19 +118,8 @@ export function EmailList({
     )
   }
 
-  if (items.length === 0) {
-    return (
-      <Card title="Письма" variant="muted">
-        <EmptyState
-          description="Измените период или mailbox, если ожидаете данные."
-          title="За выбранный период писем нет"
-        />
-      </Card>
-    )
-  }
-
   return (
-    <Card title="Письма" variant="muted">
+    <Card className={styles.card} title="Письма" variant="muted">
       <div className={styles.searchField}>
         <Field label="Поиск по загруженным письмам">
           <Input
@@ -141,32 +130,51 @@ export function EmailList({
           />
         </Field>
       </div>
-      <DataList>
-        {items.map((item) => (
-          <DataList.Item
-            badge={
-              <Badge tone={getConfidenceTone(item.confidence)}>
-                {formatConfidence(item.confidence)}
-              </Badge>
+      {items.length === 0 ? (
+        <div className={styles.scrollArea}>
+          <EmptyState
+            description={
+              search.trim()
+                ? 'Измените поисковый запрос или сбросьте дополнительные фильтры.'
+                : 'Измените период или mailbox, если ожидаете данные.'
             }
-            description={item.summary_preview}
-            key={item.id}
-            meta={[
-              item.from,
-              formatDateTime(item.received_at),
-              `${item.attachment_count} влож.`,
-            ]}
-            onClick={() => onSelect(item.id)}
-            selected={item.id === selectedId}
-            title={item.subject || 'Без темы'}
+            title={search.trim() ? 'Поиск ничего не нашёл' : 'Писем нет'}
           />
-        ))}
-        <div aria-hidden="true" className={styles.sentinel} ref={targetRef} />
-      </DataList>
-      {hasNextPage && (
-        <p className={styles.autoLoadStatus}>
-          {isFetchingNextPage ? 'Загружаем письма…' : 'Прокрутите ниже'}
-        </p>
+        </div>
+      ) : (
+        <div className={styles.scrollArea}>
+          <DataList>
+            {items.map((item) => (
+              <DataList.Item
+                badge={
+                  <Badge tone={getConfidenceTone(item.confidence)}>
+                    {formatConfidence(item.confidence)}
+                  </Badge>
+                }
+                description={item.summary_preview}
+                key={item.id}
+                meta={[
+                  item.from,
+                  formatDateTime(item.received_at),
+                  `${item.attachment_count} влож.`,
+                ]}
+                onClick={() => onSelect(item.id)}
+                selected={item.id === selectedId}
+                title={item.subject || 'Без темы'}
+              />
+            ))}
+            <div
+              aria-hidden="true"
+              className={styles.sentinel}
+              ref={targetRef}
+            />
+          </DataList>
+          {hasNextPage && (
+            <p className={styles.autoLoadStatus}>
+              {isFetchingNextPage ? 'Загружаем письма…' : 'Прокрутите ниже'}
+            </p>
+          )}
+        </div>
       )}
     </Card>
   )

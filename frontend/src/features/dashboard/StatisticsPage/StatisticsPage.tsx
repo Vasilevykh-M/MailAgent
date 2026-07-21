@@ -12,6 +12,8 @@ import { HealthIndicator } from '../HealthIndicator'
 import { StatisticsCards } from '../StatisticsCards'
 import { StatisticsCharts } from '../StatisticsCharts'
 
+import styles from './StatisticsPage.module.css'
+
 export function StatisticsPage() {
   const [filters, setFilters] = useState(defaultFilters)
   const apiParams = useMemo(
@@ -38,23 +40,28 @@ export function StatisticsPage() {
       }
       title="Mail Agent"
     >
-      <DashboardFilters
-        onChange={setFilters}
-        showListFilters={false}
-        value={filters}
-      />
+      <div className={styles.contentGrid}>
+        <DashboardFilters
+          onChange={setFilters}
+          placement="sidebar"
+          showListFilters={false}
+          value={filters}
+        />
 
-      <StatisticsCards
-        data={statistics.data}
-        isError={statistics.isError}
-        isLoading={statistics.isLoading}
-      />
+        <div className={styles.mainColumn}>
+          <StatisticsCards
+            data={statistics.data}
+            isError={statistics.isError}
+            isLoading={statistics.isLoading}
+          />
 
-      <StatisticsCharts
-        data={statistics.data}
-        isError={statistics.isError}
-        isLoading={statistics.isLoading}
-      />
+          <StatisticsCharts
+            data={statistics.data}
+            isError={statistics.isError}
+            isLoading={statistics.isLoading}
+          />
+        </div>
+      </div>
     </PageShell>
   )
 }

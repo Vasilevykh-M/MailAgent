@@ -14,14 +14,12 @@
   text-align: left;
   transition:
     border-color 160ms ease,
-    background 160ms ease,
-    transform 160ms ease;
+    background 160ms ease;
 }
 
 .item:hover {
   border-color: var(--color-border-strong);
   background: #262c36;
-  transform: translateY(-1px);
 }
 
 .item:focus-visible {

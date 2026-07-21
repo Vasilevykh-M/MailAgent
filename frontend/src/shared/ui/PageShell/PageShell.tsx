@@ -25,7 +25,7 @@ export function PageShell({
             {actions && <div className={styles.actions}>{actions}</div>}
           </div>
         </header>
-        {children}
+        <div className={styles.content}>{children}</div>
       </div>
     </main>
   )

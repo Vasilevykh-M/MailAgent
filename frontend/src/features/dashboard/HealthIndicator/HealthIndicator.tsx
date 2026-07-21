@@ -1,21 +1,50 @@
+import { CircleCheck, CircleX, LoaderCircle } from 'lucide-react'
+
 import { useHealthReady } from '../../../api'
-import { Badge } from '../../../shared'
+
+import styles from './HealthIndicator.module.css'
 
 export function HealthIndicator() {
   const health = useHealthReady()
   const isReady = health.data?.status === 'ok'
 
   if (health.isLoading) {
-    return <Badge tone="neutral">Проверка</Badge>
+    return (
+      <span
+        aria-label="Проверка соединения"
+        className={styles.icon}
+        title="Проверка соединения"
+      >
+        <LoaderCircle aria-hidden="true" className={styles.neutral} size={18} />
+      </span>
+    )
   }
 
   if (health.isError) {
-    return <Badge tone="danger">Нет соединения</Badge>
+    return (
+      <span
+        aria-label="Нет соединения"
+        className={styles.icon}
+        title="Нет соединения"
+      >
+        <CircleX aria-hidden="true" className={styles.danger} size={18} />
+      </span>
+    )
   }
 
+  const Icon = isReady ? CircleCheck : CircleX
+
   return (
-    <Badge tone={isReady ? 'success' : 'warning'}>
-      {isReady ? 'Есть соединение' : 'Нет соединения'}
-    </Badge>
+    <span
+      aria-label={isReady ? 'Есть соединение' : 'Сервис недоступен'}
+      className={styles.icon}
+      title={isReady ? 'Есть соединение' : 'Сервис недоступен'}
+    >
+      <Icon
+        aria-hidden="true"
+        className={isReady ? styles.success : styles.warning}
+        size={18}
+      />
+    </span>
   )
 }

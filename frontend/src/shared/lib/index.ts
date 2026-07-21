@@ -2,6 +2,7 @@ export {
   dateInputToIsoNextDay,
   dateInputToIsoStart,
   formatConfidence,
+  formatDateInputDisplay,
   formatDateForInput,
   formatDateTime,
   formatFileSize,
