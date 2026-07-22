@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ThemeContext, type ThemeName } from './context'
 
 const themeStorageKey = 'mail-agent-theme'
-const defaultTheme: ThemeName = 'dark'
+const defaultTheme: ThemeName = 'light'
 
 function readStoredTheme(): ThemeName {
   if (typeof window === 'undefined') {
