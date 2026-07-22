@@ -4,6 +4,7 @@
   height: 18px;
   align-items: center;
   justify-content: center;
+  line-height: 0;
 }
 
 .neutral {

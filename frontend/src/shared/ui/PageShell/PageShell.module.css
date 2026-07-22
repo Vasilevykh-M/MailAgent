@@ -44,6 +44,7 @@
 .actions {
   margin-left: auto;
   display: inline-flex;
+  align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);

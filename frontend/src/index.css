@@ -19,6 +19,7 @@
   --color-surface: #161b22;
   --color-surface-muted: #161b22;
   --color-surface-strong: #21262d;
+  --color-surface-hover: #262c36;
   --color-border: #30363d;
   --color-border-strong: #484f58;
   --color-text: #f0f6fc;
@@ -53,6 +54,34 @@
   --space-page-x: 20px;
   --space-page-y: 20px;
   --control-padding-inline: 10px;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-bg: #f6f8fa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #ffffff;
+  --color-surface-strong: #f6f8fa;
+  --color-surface-hover: #f3f4f6;
+  --color-border: #d0d7de;
+  --color-border-strong: #afb8c1;
+  --color-text: #24292f;
+  --color-text-muted: #57606a;
+  --color-text-subtle: #6e7781;
+  --color-accent: #0969da;
+  --color-accent-strong: #0969da;
+  --color-accent-muted: rgba(9, 105, 218, 0.12);
+  --color-success: #1a7f37;
+  --color-success-muted: rgba(26, 127, 55, 0.12);
+  --color-warning: #9a6700;
+  --color-warning-muted: rgba(154, 103, 0, 0.12);
+  --color-danger: #cf222e;
+  --color-danger-muted: rgba(207, 34, 46, 0.12);
+  --color-info: #0969da;
+  --color-info-muted: rgba(9, 105, 218, 0.12);
+  --color-neutral-muted: rgba(175, 184, 193, 0.2);
+  --shadow-focus: 0 0 0 2px rgba(9, 105, 218, 0.24);
 }
 
 @media (max-width: 640px) {

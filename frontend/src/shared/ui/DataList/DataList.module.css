@@ -19,7 +19,7 @@
 
 .item:hover {
   border-color: var(--color-border-strong);
-  background: #262c36;
+  background: var(--color-surface-hover);
 }
 
 .item:focus-visible {

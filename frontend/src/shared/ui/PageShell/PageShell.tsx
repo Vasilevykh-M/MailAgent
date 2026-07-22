@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 
+import { ThemeSwitch } from '../ThemeSwitch'
+
 import styles from './PageShell.module.css'
 
 type PageShellProps = {
@@ -22,7 +24,10 @@ export function PageShell({
           <div className={styles.headerRow}>
             <h1 className={styles.brand}>{title}</h1>
             {navigation}
-            {actions && <div className={styles.actions}>{actions}</div>}
+            <div className={styles.actions}>
+              {actions}
+              <ThemeSwitch />
+            </div>
           </div>
         </header>
         <div className={styles.content}>{children}</div>

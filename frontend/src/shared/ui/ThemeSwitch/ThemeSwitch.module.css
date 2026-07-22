@@ -1,0 +1,37 @@
+.switch {
+  display: inline-flex;
+  width: 34px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  align-items: center;
+  cursor: pointer;
+  background: var(--color-surface-strong);
+  color: var(--color-text-muted);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.switch:hover {
+  border-color: var(--color-accent-strong);
+  color: var(--color-text);
+}
+
+.thumb {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  margin: 0 2px;
+  border-radius: 999px;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  transition: transform 160ms ease;
+}
+
+.light .thumb {
+  transform: translateX(10px);
+}
