@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -125,6 +125,26 @@ def _month_bounds(moment: datetime) -> tuple[datetime, datetime]:
     else:
         end = start.replace(month=start.month + 1)
     return start, end
+
+
+def _mapping(value: object) -> Mapping[str, Any]:
+    """Возвращает mapping только для безопасного чтения JSONB-значений."""
+
+    return value if isinstance(value, Mapping) else {}
+
+
+def _classification_values(agent_result: object) -> tuple[str | None, str | None]:
+    """Извлекает публичные поля классификации из потенциально некорректного JSONB."""
+
+    agent_result_mapping = _mapping(agent_result)
+    summary = _mapping(agent_result_mapping.get("summary"))
+    classification = _mapping(summary.get("classification"))
+    class_code = classification.get("class_code")
+    class_name_ru = classification.get("class_name_ru")
+    return (
+        class_code if isinstance(class_code, str) else None,
+        class_name_ru if isinstance(class_name_ru, str) else None,
+    )
 
 
 class ResultRepository:
@@ -322,18 +342,25 @@ class ResultRepository:
                     )
                 ).scalars()
             )
-        return [
-            EmailListItem(
-                record_id=row.record_id,
-                received_at=row.received_at,
-                **{"from": row.sender},
-                subject=row.subject,
-                summary_preview=str(row.agent_result.get("summary", {}).get("summary_ru", ""))[:500],
-                attachment_count=int(row.agent_result.get("attachment_count", 0)),
-                confidence=row.agent_result.get("summary", {}).get("confidence"),
+        items: list[EmailListItem] = []
+        for row in rows:
+            agent_result = _mapping(row.agent_result)
+            summary = _mapping(agent_result.get("summary"))
+            class_code, class_name_ru = _classification_values(row.agent_result)
+            items.append(
+                EmailListItem(
+                    record_id=row.record_id,
+                    received_at=row.received_at,
+                    **{"from": row.sender},
+                    subject=row.subject,
+                    summary_preview=str(summary.get("summary_ru", ""))[:500],
+                    attachment_count=int(agent_result.get("attachment_count", 0)),
+                    confidence=summary.get("confidence"),
+                    class_code=class_code,
+                    class_name_ru=class_name_ru,
+                )
             )
-            for row in rows
-        ]
+        return items
 
     async def statistics(self, start: datetime, end: datetime, *, mailbox: str | None = None) -> dict[str, Any]:
         """Возвращает агрегаты периода, не делая неограниченного сканирования партиций."""

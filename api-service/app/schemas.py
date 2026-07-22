@@ -110,6 +110,8 @@ class EmailListItem(APIModel):
     summary_preview: str
     attachment_count: int
     confidence: float | None = None
+    class_code: str | None = None
+    class_name_ru: str | None = None
 
     @model_validator(mode="after")
     def public_id_matches_record_id(self) -> EmailListItem:

@@ -7,10 +7,11 @@ import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.config import Settings
-from app.db import CommitResult
+from app.db import CommitResult, _classification_values
 from app.errors import ConflictError, NotFoundError
 from app.main import create_app
 from app.schemas import EmailListItem, IngestionPayload
@@ -77,6 +78,8 @@ class MemoryRepository:
                 summary_preview="Кратко",
                 attachment_count=1,
                 confidence=0.9,
+                class_code="MACHINES",
+                class_name_ru="Станки",
             ),
             EmailListItem(
                 record_id="c" * 64,
@@ -86,6 +89,8 @@ class MemoryRepository:
                 summary_preview="Кратко",
                 attachment_count=0,
                 confidence=0.8,
+                class_code=None,
+                class_name_ru=None,
             ),
         ]
         return values[:limit]
@@ -339,13 +344,22 @@ def test_statistics_rejects_invalid_period() -> None:
     assert response.json()["error"] == "invalid_payload"
 
 
-def test_reader_list_and_detail_stream_without_storage_url() -> None:
+def test_reader_list_includes_classification_fields_and_detail_stream_without_storage_url() -> None:
     test_client, _repository, _storage = client()
-    list_response = test_client.get("/api/v1/emails?limit=1", headers={"Authorization": "Bearer reader"})
+    list_response = test_client.get("/api/v1/emails?limit=2", headers={"Authorization": "Bearer reader"})
     assert list_response.status_code == 200
-    list_item = list_response.json()["items"][0]
-    assert list_item["id"] == list_item["record_id"]
-    assert list_item["subject"] == "Тема"
+    list_items = list_response.json()["items"]
+    classified_item, unclassified_item = list_items
+    assert classified_item["id"] == classified_item["record_id"]
+    assert classified_item["subject"] == "Тема"
+    assert "class_code" in classified_item
+    assert "class_name_ru" in classified_item
+    assert classified_item["class_code"] == "MACHINES"
+    assert classified_item["class_name_ru"] == "Станки"
+    assert "class_code" in unclassified_item
+    assert "class_name_ru" in unclassified_item
+    assert unclassified_item["class_code"] is None
+    assert unclassified_item["class_name_ru"] is None
     assert list_response.json()["has_more"]
     payload = payload_for()
     assert (
@@ -379,3 +393,38 @@ def test_reader_list_and_detail_stream_without_storage_url() -> None:
     raw = test_client.get(data["raw_download_url"], headers={"X-API-Key": "reader"})
     assert raw.headers["content-type"].startswith("message/rfc822")
     assert raw.content == b"From: sender\r\n\r\nbody"
+
+
+@pytest.mark.parametrize(
+    ("agent_result", "expected"),
+    [
+        (
+            {
+                "summary": {
+                    "classification": {"class_code": "MACHINES", "class_name_ru": "Станки"},
+                }
+            },
+            ("MACHINES", "Станки"),
+        ),
+        ({"summary": {}}, (None, None)),
+        ({}, (None, None)),
+        (None, (None, None)),
+        ([], (None, None)),
+        ("invalid", (None, None)),
+        ({"summary": "invalid"}, (None, None)),
+        ({"summary": {"classification": None}}, (None, None)),
+        ({"summary": {"classification": []}}, (None, None)),
+        (
+            {"summary": {"classification": {"class_code": 123, "class_name_ru": "Станки"}}},
+            (None, "Станки"),
+        ),
+        (
+            {"summary": {"classification": {"class_code": "MACHINES", "class_name_ru": ["Станки"]}}},
+            ("MACHINES", None),
+        ),
+    ],
+)
+def test_classification_values_handles_malformed_agent_results(
+    agent_result: object, expected: tuple[str | None, str | None]
+) -> None:
+    assert _classification_values(agent_result) == expected
