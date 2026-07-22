@@ -59,32 +59,24 @@ function matchesAttachmentFilter(
   })
 }
 
-function matchesConfidenceFilter(
+function matchesClassFilter(
   item: EmailListItem,
-  filter: DashboardFiltersValue['confidenceFilter'],
+  detail: EmailDetail | undefined,
+  filter: DashboardFiltersValue['classFilter'],
 ) {
   if (filter.length === 0) {
     return true
   }
 
+  const classCode =
+    item.class_code ?? detail?.classification?.class_code ?? null
+
   return filter.some((filterValue) => {
     if (filterValue === 'none') {
-      return item.confidence === null
+      return !classCode
     }
 
-    if (filterValue === 'high') {
-      return typeof item.confidence === 'number' && item.confidence >= 0.8
-    }
-
-    if (filterValue === 'medium') {
-      return (
-        typeof item.confidence === 'number' &&
-        item.confidence >= 0.5 &&
-        item.confidence < 0.8
-      )
-    }
-
-    return typeof item.confidence === 'number' && item.confidence < 0.5
+    return classCode === filterValue
   })
 }
 
@@ -126,9 +118,29 @@ export function DashboardPage() {
   const emailItems =
     emails.data?.pages
       .flatMap((page) => page.items)
+      .map((item) => {
+        const detail = queryClient.getQueryData<EmailDetail>(
+          queryKeys.emails.detail(item.id),
+        )
+
+        return {
+          ...item,
+          class_code: item.class_code ?? detail?.classification?.class_code,
+          class_name_ru:
+            item.class_name_ru ?? detail?.classification?.class_name_ru,
+        }
+      })
       .filter((item) => matchesSearch(item, search))
       .filter((item) => matchesAttachmentFilter(item, filters.attachmentFilter))
-      .filter((item) => matchesConfidenceFilter(item, filters.confidenceFilter))
+      .filter((item) =>
+        matchesClassFilter(
+          item,
+          queryClient.getQueryData<EmailDetail>(
+            queryKeys.emails.detail(item.id),
+          ),
+          filters.classFilter,
+        ),
+      )
       .filter((item) =>
         matchesStatusFilter(
           queryClient.getQueryData<EmailDetail>(

@@ -13,7 +13,7 @@ export function defaultFilters(): DashboardFiltersValue {
     toDate: formatDateForInput(today),
     mailbox: apiConfig.defaultMailbox,
     attachmentFilter: [],
-    confidenceFilter: [],
+    classFilter: [],
     statusFilter: [],
   }
 }

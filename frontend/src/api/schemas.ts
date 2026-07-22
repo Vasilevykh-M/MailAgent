@@ -25,6 +25,8 @@ export const emailListItemSchema = z.object({
   summary_preview: z.string(),
   attachment_count: z.number().int().nonnegative(),
   confidence: z.number().nullable(),
+  class_code: z.string().optional().nullable(),
+  class_name_ru: z.string().optional().nullable(),
 })
 
 export const emailListResponseSchema = z.object({

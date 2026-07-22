@@ -49,6 +49,64 @@
   text-align: center;
 }
 
+.classBadge {
+  flex: 0 0 auto;
+  max-width: 260px;
+  border-color: color-mix(in srgb, currentcolor 36%, transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.class3dPrinters {
+  background: rgba(34, 211, 238, 0.14);
+  color: #67e8f9;
+}
+
+.classChemistry {
+  background: rgba(74, 222, 128, 0.14);
+  color: #86efac;
+}
+
+.classFoundry {
+  background: rgba(251, 146, 60, 0.14);
+  color: #fdba74;
+}
+
+.classMoldPrinting {
+  background: rgba(244, 114, 182, 0.14);
+  color: #f9a8d4;
+}
+
+.classRoboticCells {
+  background: rgba(96, 165, 250, 0.14);
+  color: #93c5fd;
+}
+
+.classProductionLines {
+  background: rgba(167, 139, 250, 0.14);
+  color: #c4b5fd;
+}
+
+.classMachines {
+  background: rgba(52, 211, 153, 0.14);
+  color: #6ee7b7;
+}
+
+.classTechnicalVision {
+  background: rgba(250, 204, 21, 0.14);
+  color: #fde047;
+}
+
+.classOtherEquipment {
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
+}
+
+.classNone {
+  background: var(--color-neutral-muted);
+  color: var(--color-text-subtle);
+}
+
 @media (max-width: 1023px) {
   .card {
     --email-list-card-padding: var(--space-3);

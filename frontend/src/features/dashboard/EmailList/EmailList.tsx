@@ -11,16 +11,22 @@ import {
   Input,
   Skeleton,
 } from '../../../shared'
-import {
-  formatConfidence,
-  formatDateTime,
-  getConfidenceTone,
-  useIntersectionObserver,
-} from '../../../shared'
+import { formatDateTime, useIntersectionObserver } from '../../../shared'
 
 import styles from './EmailList.module.css'
 
 const autoLoadThrottleMs = 1000
+const classNamesByCode = new Map<string, string>([
+  ['3D_PRINTERS', '3D-принтеры'],
+  ['CHEMISTRY', 'Химия'],
+  ['FOUNDRY', 'Литьё'],
+  ['MOLD_PRINTING', 'Печать форм'],
+  ['ROBOTIC_CELLS', 'Роботизированные ячейки'],
+  ['PRODUCTION_LINES', 'Производственные линии'],
+  ['MACHINES', 'Станки'],
+  ['TECHNICAL_VISION', 'Техническое зрение'],
+  ['OTHER_EQUIPMENT', 'Другое оборудование'],
+])
 
 type EmailListProps = {
   items: EmailListItem[]
@@ -34,6 +40,34 @@ type EmailListProps = {
   onLoadMore: () => void
   onSearchChange: (search: string) => void
   onSelect: (recordId: string) => void
+}
+
+function getClassLabel(item: EmailListItem) {
+  return (
+    item.class_name_ru ||
+    (item.class_code ? classNamesByCode.get(item.class_code) : null) ||
+    item.class_code ||
+    'Без класса'
+  )
+}
+
+function getClassBadgeClass(classCode: string | null | undefined) {
+  const code = classCode ?? 'none'
+
+  return (
+    {
+      '3D_PRINTERS': styles.class3dPrinters,
+      CHEMISTRY: styles.classChemistry,
+      FOUNDRY: styles.classFoundry,
+      MOLD_PRINTING: styles.classMoldPrinting,
+      ROBOTIC_CELLS: styles.classRoboticCells,
+      PRODUCTION_LINES: styles.classProductionLines,
+      MACHINES: styles.classMachines,
+      TECHNICAL_VISION: styles.classTechnicalVision,
+      OTHER_EQUIPMENT: styles.classOtherEquipment,
+      none: styles.classNone,
+    }[code] ?? styles.classNone
+  )
 }
 
 export function EmailList({
@@ -147,8 +181,11 @@ export function EmailList({
             {items.map((item) => (
               <DataList.Item
                 badge={
-                  <Badge tone={getConfidenceTone(item.confidence)}>
-                    {formatConfidence(item.confidence)}
+                  <Badge
+                    className={`${styles.classBadge} ${getClassBadgeClass(item.class_code)}`}
+                    tone="neutral"
+                  >
+                    {getClassLabel(item)}
                   </Badge>
                 }
                 description={item.summary_preview}

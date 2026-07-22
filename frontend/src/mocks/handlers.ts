@@ -101,6 +101,8 @@ function toListItem(email: MockEmailDetail) {
     summary_preview: email.summary.slice(0, 500),
     attachment_count: email.attachments.length,
     confidence,
+    class_code: email.classification?.class_code ?? null,
+    class_name_ru: email.classification?.class_name_ru ?? null,
   }
 }
 

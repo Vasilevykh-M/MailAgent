@@ -5,7 +5,17 @@ import { DateRangePicker, Field, Input, MultiSelect } from '../../../shared'
 import styles from './DashboardFilters.module.css'
 
 type AttachmentFilterValue = 'with' | 'without'
-type ConfidenceFilterValue = 'high' | 'medium' | 'low' | 'none'
+type ClassFilterValue =
+  | '3D_PRINTERS'
+  | 'CHEMISTRY'
+  | 'FOUNDRY'
+  | 'MOLD_PRINTING'
+  | 'ROBOTIC_CELLS'
+  | 'PRODUCTION_LINES'
+  | 'MACHINES'
+  | 'TECHNICAL_VISION'
+  | 'OTHER_EQUIPMENT'
+  | 'none'
 type StatusFilterValue =
   | 'classified'
   | 'new_project'
@@ -17,7 +27,7 @@ export type DashboardFiltersValue = {
   toDate: string
   mailbox: string
   attachmentFilter: AttachmentFilterValue[]
-  confidenceFilter: ConfidenceFilterValue[]
+  classFilter: ClassFilterValue[]
   statusFilter: StatusFilterValue[]
 }
 
@@ -84,6 +94,36 @@ export function DashboardFilters({
           <div className={styles.group}>
             <p className={styles.groupTitle}>Список</p>
             <div className={styles.groupGrid}>
+              <Field label="Класс">
+                <MultiSelect
+                  onChange={(classFilter) =>
+                    onChange({ ...value, classFilter })
+                  }
+                  options={[
+                    { label: '3D-принтеры', value: '3D_PRINTERS' },
+                    { label: 'Химия', value: 'CHEMISTRY' },
+                    { label: 'Литьё', value: 'FOUNDRY' },
+                    { label: 'Печать форм', value: 'MOLD_PRINTING' },
+                    {
+                      label: 'Роботизированные ячейки',
+                      value: 'ROBOTIC_CELLS',
+                    },
+                    {
+                      label: 'Производственные линии',
+                      value: 'PRODUCTION_LINES',
+                    },
+                    { label: 'Станки', value: 'MACHINES' },
+                    {
+                      label: 'Техническое зрение',
+                      value: 'TECHNICAL_VISION',
+                    },
+                    { label: 'Другое оборудование', value: 'OTHER_EQUIPMENT' },
+                    { label: 'Без класса', value: 'none' },
+                  ]}
+                  placeholder="Все"
+                  value={value.classFilter}
+                />
+              </Field>
               <Field label="Вложения">
                 <MultiSelect
                   onChange={(attachmentFilter) =>
@@ -95,21 +135,6 @@ export function DashboardFilters({
                   ]}
                   placeholder="Все"
                   value={value.attachmentFilter}
-                />
-              </Field>
-              <Field label="Уверенность">
-                <MultiSelect
-                  onChange={(confidenceFilter) =>
-                    onChange({ ...value, confidenceFilter })
-                  }
-                  options={[
-                    { label: 'Высокая', value: 'high' },
-                    { label: 'Средняя', value: 'medium' },
-                    { label: 'Низкая', value: 'low' },
-                    { label: 'Нет оценки', value: 'none' },
-                  ]}
-                  placeholder="Любая"
-                  value={value.confidenceFilter}
                 />
               </Field>
               <Field label="Статус">
