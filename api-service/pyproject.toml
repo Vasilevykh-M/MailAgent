@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "alembic>=1.14",
+  "argon2-cffi>=23.1",
   "asyncpg>=0.30",
   "boto3>=1.35",
   "fastapi>=0.115",
@@ -27,6 +28,8 @@ dev = ["httpx>=0.28", "mypy>=1.13", "pytest>=8.3", "pytest-asyncio>=0.24", "ruff
 mail-results-api = "app.main:run"
 mail-results-partitions = "app.maintenance:main"
 mail-results-orphans = "app.maintenance:orphan_main"
+mail-results-auth = "app.auth.cli:auth_main"
+mail-results-users = "app.auth.cli:users_main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]

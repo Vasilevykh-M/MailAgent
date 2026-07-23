@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import hmac
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
 
 from fastapi import Header
 
 from .config import Settings, get_settings
 from .errors import AuthenticationError
+
+if TYPE_CHECKING:
+    from .auth.service import AuthenticationService
 
 
 def _authenticated(provided: str | None, expected: str) -> bool:
@@ -27,10 +31,13 @@ def require_writer(settings: Settings | None = None) -> Callable[[str | None], N
     return dependency
 
 
-def require_reader(settings: Settings | None = None) -> Callable[[str | None], None]:
+def require_reader(
+    settings: Settings | None = None,
+    authentication_service: AuthenticationService | None = None,
+) -> Callable[..., Awaitable[None]]:
     selected = settings or get_settings()
 
-    def dependency(
+    async def dependency(
         x_api_key: str | None = Header(default=None, alias="X-API-Key"),
         authorization: str | None = Header(default=None),
     ) -> None:
@@ -38,7 +45,11 @@ def require_reader(settings: Settings | None = None) -> Callable[[str | None], N
             return
         bearer = authorization[7:] if authorization and authorization.lower().startswith("bearer ") else None
         expected = selected.reader_api_key.get_secret_value()
-        if not (_authenticated(x_api_key, expected) or _authenticated(bearer, expected)):
-            raise AuthenticationError()
+        if _authenticated(x_api_key, expected) or _authenticated(bearer, expected):
+            return
+        if bearer is not None and authentication_service is not None:
+            await authentication_service.current_user(bearer)
+            return
+        raise AuthenticationError()
 
     return dependency

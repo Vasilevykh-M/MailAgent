@@ -16,6 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.datastructures import UploadFile
 
+from .auth.repository import AuthRepository
+from .auth.router import create_auth_router
+from .auth.service import AuthenticationService
 from .config import Settings, get_settings
 from .db import Attachment, Database, ResultRepository
 from .errors import APIError, ValidationAPIError
@@ -88,6 +91,7 @@ def create_app(
     *,
     repository: ResultRepository | None = None,
     storage: ObjectStorage | None = None,
+    auth_repository: AuthRepository | None = None,
 ) -> FastAPI:
     selected = settings or get_settings()
     if repository is None:
@@ -98,10 +102,29 @@ def create_app(
         database = None
         result_repository = repository
     object_storage = storage or S3Storage(selected)
+    selected_auth_repository = auth_repository or (AuthRepository(database.sessions) if database is not None else None)
+    authentication_service = (
+        AuthenticationService(selected_auth_repository, selected) if selected_auth_repository is not None else None
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         try:
+            if selected.administrator_bootstrap_enabled:
+                if authentication_service is None:
+                    raise RuntimeError("Authentication administrator bootstrap requires a database repository")
+                try:
+                    outcome = await authentication_service.bootstrap_administrator()
+                except Exception:
+                    LOGGER.error("Authentication administrator bootstrap failed")
+                    raise
+                if outcome is not None:
+                    if outcome.created:
+                        LOGGER.info("Authentication administrator created")
+                    elif outcome.password_changed or outcome.reactivated:
+                        LOGGER.info("Authentication administrator synchronized")
+                    else:
+                        LOGGER.info("Authentication administrator already up to date")
             yield
         finally:
             if database is not None:
@@ -121,6 +144,9 @@ def create_app(
     app.state.repository = result_repository
     app.state.storage = object_storage
     app.state.database = database
+    app.state.authentication_service = authentication_service
+
+    app.include_router(create_auth_router(selected, authentication_service))
 
     @app.middleware("http")
     async def request_context(request: Request, call_next: Any) -> Any:
@@ -211,7 +237,7 @@ def create_app(
 
     @app.get("/api/v1/emails", response_model=EmailListResponse)
     async def list_emails(
-        _: None = Depends(require_reader(selected)),
+        _: None = Depends(require_reader(selected, authentication_service)),
         limit: Annotated[int, Query(ge=1, le=100)] = 50,
         cursor: str | None = None,
         from_: Annotated[datetime | None, Query(alias="from")] = None,
@@ -257,7 +283,7 @@ def create_app(
         from_: Annotated[datetime, Query(alias="from")],
         to: Annotated[datetime, Query()],
         mailbox: str | None = None,
-        _: None = Depends(require_reader(selected)),
+        _: None = Depends(require_reader(selected, authentication_service)),
     ) -> StatisticsResponse:
         if from_.tzinfo is None or to.tzinfo is None:
             raise ValidationAPIError("Statistics period must include a timezone")
@@ -279,7 +305,9 @@ def create_app(
         )
 
     @app.get("/api/v1/emails/{record_id}", response_model=EmailDetail)
-    async def get_email(record_id: str, _: None = Depends(require_reader(selected))) -> EmailDetail:
+    async def get_email(
+        record_id: str, _: None = Depends(require_reader(selected, authentication_service))
+    ) -> EmailDetail:
         email, attachments = await result_repository.detail(record_id)
         original_email = OriginalEmail.model_validate(email.original_email)
         agent_result = _mapping(email.agent_result)
@@ -310,7 +338,7 @@ def create_app(
 
     @app.get("/api/v1/emails/{record_id}/attachments/{attachment_id}/content")
     async def get_attachment(
-        record_id: str, attachment_id: uuid.UUID, _: None = Depends(require_reader(selected))
+        record_id: str, attachment_id: uuid.UUID, _: None = Depends(require_reader(selected, authentication_service))
     ) -> StreamingResponse:
         attachment = await result_repository.attachment(record_id, attachment_id)
         await asyncio.to_thread(object_storage.head, attachment.object_key)
@@ -324,7 +352,9 @@ def create_app(
         )
 
     @app.get("/api/v1/emails/{record_id}/raw")
-    async def get_raw(record_id: str, _: None = Depends(require_reader(selected))) -> StreamingResponse:
+    async def get_raw(
+        record_id: str, _: None = Depends(require_reader(selected, authentication_service))
+    ) -> StreamingResponse:
         email, _attachments = await result_repository.detail(record_id)
         await asyncio.to_thread(object_storage.head, email.raw_key)
         return StreamingResponse(

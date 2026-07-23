@@ -16,13 +16,47 @@ curl -X PUT "http://127.0.0.1:8080/api/v1/internal/emails/$RECORD_ID" \
 
 Успех возвращает `record_id`, `status: committed`, generation, количество вложений, `storage_verified` и время commit.
 
+## Аутентификация
+
+`POST /api/v1/auth/login` публичен. Он принимает username и password и возвращает
+opaque token единственный раз. Для неизвестного пользователя, неверного пароля и
+отключённого пользователя API возвращает одинаковый безопасный `401`.
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"replace-with-a-strong-secret"}'
+```
+
+```json
+{
+  "access_token": "opaque-session-token",
+  "token_type": "bearer",
+  "expires_in": 28800,
+  "user": {"id": "uuid", "username": "admin"}
+}
+```
+
+`GET /api/v1/auth/me` требует `Authorization: Bearer <access-token>` и возвращает
+только `id` и `username`. `POST /api/v1/auth/logout` с тем же заголовком отвечает
+`204 No Content` и отзывает именно эту сессию. Reader key не является
+пользовательской сессией и не работает для этих маршрутов.
+
+```bash
+curl http://127.0.0.1:8080/api/v1/auth/me \
+  -H 'Authorization: Bearer <access-token>'
+curl -X POST http://127.0.0.1:8080/api/v1/auth/logout \
+  -H 'Authorization: Bearer <access-token>'
+```
+
 ## Чтение
 
-В обычном режиме external endpoints используют `X-API-Key: READER_API_KEY` либо
+В обычном режиме external endpoints принимают действующую пользовательскую
+`Authorization: Bearer <access-token>` сессию, `X-API-Key: READER_API_KEY` либо
 `Authorization: Bearer READER_API_KEY`. При `ALLOW_ANONYMOUS_READER=true` все
 перечисленные read-only endpoints доступны без ключа. Это открывает содержимое
 писем и вложения каждому, кто может подключиться к API; включайте режим только в
-доверенной сети. Write endpoint всегда требует `WRITER_API_KEY`.
+доверенной сети. Write endpoint всегда требует только `WRITER_API_KEY`.
 
 Для браузерного frontend задайте `CORS_ALLOWED_ORIGINS` в корневом `.env`,
 например `http://localhost:4173` или несколько origin через запятую. API отвечает
