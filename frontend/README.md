@@ -29,10 +29,17 @@ npm run dev
 Настройки:
 
 ```env
+# Используется только в dev режиме. Preview/prod используют host frontend server и port 8080.
 VITE_RESULTS_API_BASE_URL=http://192.168.88.32:8080
 VITE_DEFAULT_MAILBOX=INBOX
 VITE_ENABLE_API_MOCKS=true
 ```
+
+В `npm run preview` и production build запросы к API строятся от
+`window.location.protocol`, `window.location.hostname` и фиксированного port
+`8080`. Например, если frontend открыт на `http://192.168.88.32:4173`, API будет
+вызываться на `http://192.168.88.32:8080`. Для такого режима backend или reverse
+proxy должны обслуживать `/health/*` и `/api/v1/*` на этом адресе.
 
 Не храните `READER_API_KEY` в `VITE_*` переменных: такие значения попадают в
 browser bundle. Для защищённого доступа нужен trusted LAN режим, reverse
