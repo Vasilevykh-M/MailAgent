@@ -6,8 +6,11 @@
 ## Базовая информация
 
 - Пример base URL в локальной сети: `http://192.168.88.32:8080`.
-- Read-only endpoints требуют `X-API-Key: READER_API_KEY` или
-  `Authorization: Bearer READER_API_KEY`.
+- Browser frontend использует пользовательскую сессию
+  `Authorization: Bearer <access-token>`, полученную через
+  `POST /api/v1/auth/login`.
+- Read-only endpoints также принимают технический `X-API-Key: READER_API_KEY`
+  или `Authorization: Bearer READER_API_KEY`.
 - Если на backend включён `ALLOW_ANONYMOUS_READER=true`, read-only endpoints
   доступны без ключа. Такой режим безопасен только в доверенной сети.
 - Все ответы добавляют заголовок `X-Request-ID`.
@@ -15,6 +18,35 @@
   `X-Content-Type-Options: nosniff`.
 - Прямые MinIO/S3 URL не выдаются. Вложения и исходные `.eml` скачиваются только
   потоково через API.
+
+## Аутентификация
+
+Login endpoint публичен и возвращает opaque token только один раз. Frontend
+сохраняет его локально и передаёт в read-only API как Bearer token.
+
+```bash
+curl -X POST 'http://192.168.88.32:8080/api/v1/auth/login' \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"replace-with-a-strong-secret"}'
+```
+
+```json
+{
+  "access_token": "opaque-session-token",
+  "token_type": "bearer",
+  "expires_in": 28800,
+  "user": { "id": "uuid", "username": "admin" }
+}
+```
+
+Проверка и завершение пользовательской сессии:
+
+```bash
+curl -sS 'http://192.168.88.32:8080/api/v1/auth/me' \
+  -H 'Authorization: Bearer <access-token>'
+curl -X POST 'http://192.168.88.32:8080/api/v1/auth/logout' \
+  -H 'Authorization: Bearer <access-token>'
+```
 
 ## Ошибки
 
@@ -29,7 +61,7 @@
 
 Известные коды:
 
-- `unauthorized` — нет или неверен API key, HTTP `401`.
+- `unauthorized` — нет или неверен API key/Bearer token, HTTP `401`.
 - `not_found` — запись, вложение или объект не найден, HTTP `404`.
 - `invalid_payload` — ошибка параметров запроса, HTTP `422`.
 - `generation_conflict` — конфликт поколения записи, HTTP `409`.

@@ -7,6 +7,7 @@ import {
   PageShell,
   TabsNav,
 } from '../../../shared'
+import { UserMenu } from '../../auth'
 import { DashboardFilters, defaultFilters } from '../DashboardFilters'
 import { HealthIndicator } from '../HealthIndicator'
 import { StatisticsCards } from '../StatisticsCards'
@@ -28,7 +29,12 @@ export function StatisticsPage() {
 
   return (
     <PageShell
-      actions={<HealthIndicator />}
+      actions={
+        <>
+          <HealthIndicator />
+          <UserMenu />
+        </>
+      }
       navigation={
         <TabsNav
           ariaLabel="Основная навигация"

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 
+import { AuthProvider } from '../features/auth'
 import { ThemeProvider } from '../shared'
 
 type AppProvidersProps = {
@@ -27,7 +28,9 @@ export function AppProviders({ children }: AppProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <BrowserRouter>{children}</BrowserRouter>
+        <BrowserRouter>
+          <AuthProvider>{children}</AuthProvider>
+        </BrowserRouter>
       </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

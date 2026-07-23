@@ -1,10 +1,18 @@
 export {
   getEmail,
   getEmails,
+  getCurrentUser,
   getHealthLive,
   getHealthReady,
   getStatistics,
+  login,
+  logout,
 } from './client'
+export {
+  clearStoredAuthToken,
+  getStoredAuthToken,
+  setStoredAuthToken,
+} from './authToken'
 export { ApiError } from './errors'
 export { queryKeys } from './queryKeys'
 export {
@@ -22,6 +30,7 @@ export {
 export type {
   ApiErrorResponse,
   Attachment,
+  AuthUser,
   Classification,
   ClassificationStatisticsItem,
   EmailDetail,
@@ -29,6 +38,8 @@ export type {
   EmailListParams,
   EmailListResponse,
   HealthResponse,
+  LoginPayload,
+  LoginResponse,
   OriginalEmail,
   StatisticsParams,
   StatisticsResponse,

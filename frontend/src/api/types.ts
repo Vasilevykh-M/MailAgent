@@ -5,15 +5,19 @@ import type {
   attachmentSchema,
   classificationSchema,
   classificationStatisticsItemSchema,
+  currentUserSchema,
   emailDetailSchema,
   emailListItemSchema,
   emailListResponseSchema,
   healthResponseSchema,
+  loginResponseSchema,
   originalEmailSchema,
   statisticsResponseSchema,
 } from './schemas'
 
 export type ApiErrorResponse = z.infer<typeof apiErrorSchema>
+export type AuthUser = z.infer<typeof currentUserSchema>
+export type LoginResponse = z.infer<typeof loginResponseSchema>
 export type HealthResponse = z.infer<typeof healthResponseSchema>
 export type Classification = z.infer<typeof classificationSchema>
 export type EmailListItem = z.infer<typeof emailListItemSchema>
@@ -38,4 +42,9 @@ export type StatisticsParams = {
   from: string | null
   to: string | null
   mailbox?: string | null
+}
+
+export type LoginPayload = {
+  username: string
+  password: string
 }

@@ -10,6 +10,11 @@ type Cursor = {
 const requestDelayMs = 120
 const maxLimit = 100
 const maxStatisticsPeriodMs = 3660 * 24 * 60 * 60 * 1000
+const mockAccessToken = 'mock-access-token'
+const mockUser = {
+  id: '00000000-0000-4000-8000-000000000001',
+  username: 'admin',
+}
 
 function jsonError(error: string, status: number, requestId = 'mock-request') {
   return HttpResponse.json({ error, request_id: requestId }, { status })
@@ -118,7 +123,67 @@ function headersWithRequestId(request: Request) {
   }
 }
 
+function hasAuth(request: Request) {
+  return request.headers.get('Authorization') === `Bearer ${mockAccessToken}`
+}
+
 export const handlers = [
+  http.post('*/api/v1/auth/login', async ({ request }) => {
+    await delay(requestDelayMs)
+
+    const payload = (await request.json().catch(() => null)) as {
+      password?: unknown
+      username?: unknown
+    } | null
+
+    if (
+      typeof payload?.username !== 'string' ||
+      !payload.username.trim() ||
+      typeof payload.password !== 'string' ||
+      !payload.password
+    ) {
+      return jsonError('unauthorized', 401)
+    }
+
+    return HttpResponse.json(
+      {
+        access_token: mockAccessToken,
+        expires_in: 28_800,
+        token_type: 'bearer',
+        user: {
+          ...mockUser,
+          username: payload.username.trim(),
+        },
+      },
+      { headers: headersWithRequestId(request) },
+    )
+  }),
+
+  http.get('*/api/v1/auth/me', async ({ request }) => {
+    await delay(requestDelayMs)
+
+    if (!hasAuth(request)) {
+      return jsonError('unauthorized', 401)
+    }
+
+    return HttpResponse.json(mockUser, {
+      headers: headersWithRequestId(request),
+    })
+  }),
+
+  http.post('*/api/v1/auth/logout', async ({ request }) => {
+    await delay(requestDelayMs)
+
+    if (!hasAuth(request)) {
+      return jsonError('unauthorized', 401)
+    }
+
+    return new HttpResponse(null, {
+      headers: headersWithRequestId(request),
+      status: 204,
+    })
+  }),
+
   http.get('*/health/live', async () => {
     await delay(requestDelayMs)
 

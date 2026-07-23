@@ -1,0 +1,28 @@
+.page {
+  min-height: 100vh;
+  padding: var(--space-page-y) var(--space-page-x);
+  background: var(--color-bg);
+}
+
+.container {
+  display: flex;
+  width: min(100%, 420px);
+  min-height: calc(100vh - var(--space-page-y) * 2);
+  margin: 0 auto;
+  align-items: center;
+}
+
+.card {
+  width: 100%;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

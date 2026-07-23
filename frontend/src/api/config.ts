@@ -7,9 +7,11 @@ type ApiRuntimeEnv = {
   VITE_RESULTS_API_BASE_URL?: string
 }
 
+type ApiLocation = Pick<Location, 'hostname' | 'protocol'>
+
 export function resolveApiBaseUrl(
   env: ApiRuntimeEnv = import.meta.env,
-  location: Location = globalThis.location,
+  location: ApiLocation = globalThis.location,
 ): string {
   if (env.DEV) {
     return env.VITE_RESULTS_API_BASE_URL || DEFAULT_DEV_API_BASE_URL

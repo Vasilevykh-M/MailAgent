@@ -13,7 +13,7 @@ describe('resolveApiBaseUrl', () => {
         {
           protocol: 'https:',
           hostname: 'frontend.example.com',
-        } as Location,
+        },
       ),
     ).toBe('http://127.0.0.1:8080')
   })
@@ -28,7 +28,7 @@ describe('resolveApiBaseUrl', () => {
         {
           protocol: 'https:',
           hostname: 'dashboard.example.com',
-        } as Location,
+        },
       ),
     ).toBe('https://dashboard.example.com:8080')
   })
@@ -42,8 +42,7 @@ describe('resolveApiBaseUrl', () => {
         {
           protocol: 'http:',
           hostname: '192.168.88.32',
-          port: '4173',
-        } as Location,
+        },
       ),
     ).toBe('http://192.168.88.32:8080')
   })

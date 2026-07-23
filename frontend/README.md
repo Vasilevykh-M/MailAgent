@@ -54,9 +54,22 @@ proxy/BFF или другой server-side слой авторизации.
 - В `npm run preview` и production build моки не стартуют.
 - Чтобы отключить моки в dev режиме, задайте `VITE_ENABLE_API_MOCKS=false`.
 - Service worker лежит в `public/mockServiceWorker.js`.
+- Mock login принимает любой непустой `username` и `password`.
+
+## Аутентификация
+
+- Страница `/login` вызывает `POST /api/v1/auth/login` с `username` и
+  `password`.
+- Полученный opaque token хранится в `localStorage` и передаётся во все API
+  запросы как `Authorization: Bearer <access-token>`.
+- При загрузке приложения сохранённая сессия проверяется через
+  `GET /api/v1/auth/me`.
+- Кнопка `Выйти` вызывает `POST /api/v1/auth/logout`, очищает локальный token и
+  кеш запросов.
 
 ## Что уже работает
 
+- Вход через пользовательскую Bearer-сессию Results API.
 - Проверка готовности API через `/health/ready`.
 - Фильтрация периода и `mailbox` через query параметры API.
 - Локальный поиск по загруженным страницам списка.

@@ -1,4 +1,4 @@
-import { getAbsoluteApiUrl } from './client'
+import { buildApiHeaders, getAbsoluteApiUrl } from './client'
 import { parseApiError } from './errors'
 
 function triggerBrowserDownload(blob: Blob, filename: string) {
@@ -33,7 +33,9 @@ export async function downloadBlobFromApiPath(
   path: string,
   fallbackFilename: string,
 ) {
-  const response = await fetch(getAbsoluteApiUrl(path))
+  const response = await fetch(getAbsoluteApiUrl(path), {
+    headers: buildApiHeaders({ acceptJson: false }),
+  })
 
   if (!response.ok) {
     throw await parseApiError(response)

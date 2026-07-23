@@ -7,6 +7,18 @@ export const apiErrorSchema = z.object({
   request_id: z.string(),
 })
 
+export const currentUserSchema = z.object({
+  id: z.string(),
+  username: z.string(),
+})
+
+export const loginResponseSchema = z.object({
+  access_token: z.string(),
+  token_type: z.literal('bearer'),
+  expires_in: z.number().int().positive(),
+  user: currentUserSchema,
+})
+
 export const classificationSchema = z.object({
   status: z.string().optional().nullable(),
   class_code: z.string().optional().nullable(),

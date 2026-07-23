@@ -16,6 +16,7 @@ import {
   PageShell,
   TabsNav,
 } from '../../../shared'
+import { UserMenu } from '../../auth'
 import {
   DashboardFilters,
   defaultFilters,
@@ -165,7 +166,12 @@ export function DashboardPage() {
 
   return (
     <PageShell
-      actions={<HealthIndicator />}
+      actions={
+        <>
+          <HealthIndicator />
+          <UserMenu />
+        </>
+      }
       navigation={
         <TabsNav
           ariaLabel="Основная навигация"
