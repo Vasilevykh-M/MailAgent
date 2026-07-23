@@ -103,7 +103,7 @@ export function LoginPage() {
               <Button
                 disabled={isSubmitting || !username.trim() || !password}
                 type="submit"
-                variant="primary"
+                variant="secondary"
               >
                 {isSubmitting ? 'Вход...' : 'Войти'}
               </Button>

@@ -15,7 +15,11 @@ export function HealthIndicator() {
         className={styles.icon}
         title="Проверка соединения"
       >
-        <LoaderCircle aria-hidden="true" className={styles.neutral} size={18} />
+        <LoaderCircle
+          aria-hidden="true"
+          className={`${styles.neutral} ${styles.spin}`}
+          size={18}
+        />
       </span>
     )
   }
