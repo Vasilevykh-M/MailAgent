@@ -105,6 +105,14 @@ def main(argv: list[str] | None = None) -> int:
         with CoreWorkerLock(settings.db_path):
             runtime = build_runtime(settings)
             try:
+                recovered_count = runtime.worker.repository.recover_abandoned_node_executions()
+                if recovered_count:
+                    log_event(
+                        logging.getLogger(__name__),
+                        "abandoned_node_executions_recovered",
+                        component="cli",
+                        recovered_count=recovered_count,
+                    )
                 if args.command == "once":
                     runtime.worker.once()
                 elif args.command == "worker":

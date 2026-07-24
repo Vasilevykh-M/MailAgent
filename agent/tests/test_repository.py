@@ -87,3 +87,54 @@ def test_node_execution_claim_is_unique_and_keeps_attempt_history(repository) ->
     assert execution is not None
     assert execution["attempt_count"] == 1
     assert execution["status"] == "running"
+
+
+def test_recover_abandoned_node_execution_allows_a_new_attempt(repository) -> None:
+    stable = repository.ensure("INBOX", "18", "<id>", "1")
+    repository.start(stable)
+    values = {
+        "record": stable,
+        "thread_id": stable,
+        "node_name": "summarize_message",
+        "pipeline_version": "1",
+        "execution_key": "abandoned",
+        "input_context_hash": "hash",
+        "context": {"checkpoint_thread_id": stable, "input_context_hash": "hash"},
+    }
+    assert repository.claim_node_execution(**values)["decision"] == "execute"
+
+    assert repository.recover_abandoned_node_executions() == 1
+    execution = repository.get_node_execution(stable, "summarize_message", execution_key="abandoned")
+    assert execution is not None
+    assert execution["status"] == "retryable_error"
+    assert execution["previous_status"] == "running"
+    assert execution["error_type"] == "AbandonedNodeExecution"
+    assert [item["status"] for item in repository.node_attempt_history("abandoned")] == ["retryable_error"]
+
+    claim = repository.claim_node_execution(**values)
+    assert claim["decision"] == "execute"
+    assert claim["execution"]["attempt_count"] == 2
+
+
+def test_recover_abandoned_checkpointed_node_can_be_finalized(repository) -> None:
+    stable = repository.ensure("INBOX", "19", "<id>", "1")
+    values = {
+        "record": stable,
+        "thread_id": stable,
+        "node_name": "summarize_message",
+        "pipeline_version": "1",
+        "execution_key": "checkpointed",
+        "input_context_hash": "hash",
+        "context": {"checkpoint_thread_id": stable, "input_context_hash": "hash"},
+    }
+    assert repository.claim_node_execution(**values)["decision"] == "execute"
+    repository.store_node_result("checkpointed", {"status": "processing"})
+
+    assert repository.recover_abandoned_node_executions() == 1
+    repository.complete_node_execution("checkpointed")
+
+    execution = repository.get_node_execution(stable, "summarize_message", execution_key="checkpointed")
+    assert execution is not None
+    assert execution["status"] == "completed"
+    assert execution["error_type"] is None
+    assert [item["status"] for item in repository.node_attempt_history("checkpointed")] == ["completed"]

@@ -42,6 +42,8 @@ def test_dashboard_translates_statuses_and_stages_to_russian() -> None:
     assert "manual_review:'Требуется ручная проверка'" in _HTML
     assert "summarize_message:'Суммаризация письма'" in _HTML
     assert "AttachmentProcessingUnavailable:'Не удалось корректно обработать одно или несколько вложений'" in _HTML
+    assert "NodeExecutionBusy:'Узел уже выполняется; задача будет повторена'" in _HTML
+    assert "AbandonedNodeExecution:'Предыдущее выполнение узла было прервано; задача будет повторена'" in _HTML
 
 
 def test_dashboard_keeps_completed_manual_review_in_attention_queue(tmp_path: Path) -> None:

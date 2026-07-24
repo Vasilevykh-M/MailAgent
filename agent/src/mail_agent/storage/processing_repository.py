@@ -459,13 +459,15 @@ class ProcessingRepository:
                 raise RuntimeError("Checkpoint подтверждает отсутствующий результат узла.")
             if row["output_json"] and row["execution_id"] and row["attempt_count"]:
                 connection.execute(
-                    """UPDATE node_executions SET status='completed', completed_at=?, updated_at=?
-                       WHERE execution_id=? AND status='running'""",
+                    """UPDATE node_executions
+                       SET status='completed', error_type=NULL, error_message=NULL, completed_at=?, updated_at=?
+                       WHERE execution_id=? AND status IN ('running', 'retryable_error') AND output_json IS NOT NULL""",
                     (now, now, row["execution_id"]),
                 )
                 connection.execute(
-                    """UPDATE node_execution_attempts SET status='completed', completed_at=?, updated_at=?
-                       WHERE execution_id=? AND attempt_number=? AND status='running'""",
+                    """UPDATE node_execution_attempts
+                       SET status='completed', error_type=NULL, completed_at=?, updated_at=?
+                       WHERE execution_id=? AND attempt_number=? AND status IN ('running', 'retryable_error')""",
                     (now, now, row["execution_id"], row["attempt_count"]),
                 )
             connection.execute("COMMIT")
@@ -495,6 +497,43 @@ class ProcessingRepository:
                 (status, error_type[:160], now, now, row["execution_id"], row["attempt_count"]),
             )
             connection.execute("COMMIT")
+
+    def recover_abandoned_node_executions(self) -> int:
+        """Освобождает узлы, оставшиеся ``running`` после остановки процесса.
+
+        Вызывать только после захвата ``CoreWorkerLock``: иначе живой worker мог бы
+        продолжать выполнение того же узла. Сохранённый output не удаляется — если
+        action уже попал в checkpoint, технический finalize-узел подтвердит его.
+        """
+
+        now = self._now()
+        error_type = "AbandonedNodeExecution"
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            rows = connection.execute(
+                "SELECT execution_id, attempt_count FROM node_executions WHERE status='running'"
+            ).fetchall()
+            if not rows:
+                connection.execute("COMMIT")
+                return 0
+            execution_ids = [int(row["execution_id"]) for row in rows]
+            placeholders = ",".join("?" for _ in execution_ids)
+            connection.execute(
+                f"""UPDATE node_executions
+                    SET previous_status=status, status='retryable_error', error_type=?,
+                        error_message='Детали ошибки не сохраняются.', completed_at=?, updated_at=?
+                    WHERE execution_id IN ({placeholders}) AND status='running'""",
+                (error_type, now, now, *execution_ids),
+            )
+            for row in rows:
+                connection.execute(
+                    """UPDATE node_execution_attempts
+                       SET status='retryable_error', error_type=?, completed_at=?, updated_at=?
+                       WHERE execution_id=? AND attempt_number=? AND status='running'""",
+                    (error_type, now, now, int(row["execution_id"]), int(row["attempt_count"])),
+                )
+            connection.execute("COMMIT")
+        return len(rows)
 
     def invalidate_node_execution(self, execution_key: str) -> None:
         """Отменяет reuse результата, который зависит от уже удалённых временных файлов."""

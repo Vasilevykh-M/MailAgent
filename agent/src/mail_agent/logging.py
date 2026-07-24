@@ -29,6 +29,7 @@ SAFE_LOG_FIELDS = (
     "duration_ms",
     "message_count",
     "processed_count",
+    "recovered_count",
     "attachment_count",
     "warning_count",
     "input_chars",
