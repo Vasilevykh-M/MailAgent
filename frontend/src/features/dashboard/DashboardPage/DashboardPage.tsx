@@ -133,13 +133,14 @@ export function DashboardPage() {
             value={filters}
           />
           <EmailList
+            error={emails.error}
             hasNextPage={emails.hasNextPage}
-            isError={emails.isError}
             isFetchingNextPage={emails.isFetchingNextPage}
             isLoading={emails.isLoading}
             items={emailItems}
             nextCursor={nextEmailCursor}
             onLoadMore={loadMoreEmails}
+            onRetry={() => void emails.refetch()}
             onSearchChange={setSearch}
             onSelect={selectEmail}
             search={search}
@@ -155,9 +156,10 @@ export function DashboardPage() {
         >
           <EmailDetailPanel
             data={emailDetail.data}
-            isError={emailDetail.isError}
+            error={emailDetail.error}
             isLoading={emailDetail.isLoading}
             isPlaceholder={false}
+            onRetry={() => void emailDetail.refetch()}
           />
         </Modal>
       )}

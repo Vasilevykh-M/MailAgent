@@ -64,8 +64,9 @@ export function StatisticsPage() {
         <div className={styles.mainColumn}>
           <StatisticsCards
             data={statistics.data}
-            isError={statistics.isError}
+            error={statistics.error}
             isLoading={statistics.isLoading}
+            onRetry={() => void statistics.refetch()}
           />
 
           <StatisticsCharts

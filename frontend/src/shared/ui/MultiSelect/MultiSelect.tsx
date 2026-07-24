@@ -12,6 +12,7 @@ export type MultiSelectOption<Value extends string> = {
 }
 
 export type MultiSelectProps<Value extends string> = {
+  ariaLabel: string
   options: ReadonlyArray<MultiSelectOption<Value>>
   placeholder: string
   value: Value[]
@@ -19,6 +20,7 @@ export type MultiSelectProps<Value extends string> = {
 }
 
 export function MultiSelect<Value extends string>({
+  ariaLabel,
   options,
   placeholder,
   value,
@@ -51,7 +53,7 @@ export function MultiSelect<Value extends string>({
           />
         </Button>
       </Dropdown.Trigger>
-      <Dropdown.Content className={styles.menu}>
+      <Dropdown.Content aria-label={ariaLabel} className={styles.menu}>
         {options.map((option) => (
           <Checkbox
             checked={value.includes(option.value)}

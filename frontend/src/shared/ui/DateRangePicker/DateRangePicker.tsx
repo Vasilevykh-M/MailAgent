@@ -40,7 +40,7 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
           />
         </Button>
       </Dropdown.Trigger>
-      <Dropdown.Content className={styles.content}>
+      <Dropdown.Content aria-label="Выбор периода" className={styles.content}>
         <div className={styles.grid}>
           <Field label="С даты">
             <Input

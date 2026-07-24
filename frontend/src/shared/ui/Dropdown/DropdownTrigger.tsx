@@ -12,10 +12,14 @@ type TriggerElement = ReactElement<ButtonHTMLAttributes<HTMLButtonElement>>
 
 type DropdownTriggerProps = {
   children: TriggerElement
+  popupType?: 'dialog' | 'listbox'
 }
 
-export function DropdownTrigger({ children }: DropdownTriggerProps) {
-  const { open, setOpen } = useDropdownContext()
+export function DropdownTrigger({
+  children,
+  popupType = 'dialog',
+}: DropdownTriggerProps) {
+  const { contentId, open, setOpen } = useDropdownContext()
   const child = Children.only(children)
 
   if (!isValidElement<ButtonHTMLAttributes<HTMLButtonElement>>(child)) {
@@ -23,11 +27,15 @@ export function DropdownTrigger({ children }: DropdownTriggerProps) {
   }
 
   return cloneElement(child, {
+    'aria-controls': contentId,
     'aria-expanded': open,
-    'aria-haspopup': 'menu',
+    'aria-haspopup': popupType,
     onClick: (event) => {
       child.props.onClick?.(event)
-      setOpen(!open)
+
+      if (!event.defaultPrevented) {
+        setOpen((current) => !current)
+      }
     },
   })
 }

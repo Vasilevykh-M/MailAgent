@@ -14,7 +14,10 @@ type AlertProps = {
 
 export function Alert({ title, children, tone = 'info' }: AlertProps) {
   return (
-    <div className={`${styles.alert} ${styles[tone]}`} role="status">
+    <div
+      className={`${styles.alert} ${styles[tone]}`}
+      role={tone === 'danger' ? 'alert' : 'status'}
+    >
       <p className={styles.title}>{title}</p>
       {children && <div className={styles.content}>{children}</div>}
     </div>

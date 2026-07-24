@@ -75,6 +75,7 @@ export function DashboardFilters({
             <div className={styles.groupGrid}>
               <Field label="Класс">
                 <MultiSelect
+                  ariaLabel="Выбор класса"
                   onChange={(classFilter) =>
                     onChange({ ...value, classFilter })
                   }
@@ -85,6 +86,7 @@ export function DashboardFilters({
               </Field>
               <Field label="Вложения">
                 <MultiSelect
+                  ariaLabel="Выбор наличия вложений"
                   onChange={(attachmentFilter) =>
                     onChange({ ...value, attachmentFilter })
                   }
@@ -95,6 +97,7 @@ export function DashboardFilters({
               </Field>
               <Field label="Статус">
                 <MultiSelect
+                  ariaLabel="Выбор статуса"
                   onChange={(statusFilter) =>
                     onChange({ ...value, statusFilter })
                   }

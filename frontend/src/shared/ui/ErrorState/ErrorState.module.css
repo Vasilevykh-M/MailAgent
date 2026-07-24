@@ -1,0 +1,11 @@
+.root {
+  width: 100%;
+}
+
+.details {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}

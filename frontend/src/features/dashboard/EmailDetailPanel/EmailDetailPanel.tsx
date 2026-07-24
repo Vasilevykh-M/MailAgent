@@ -25,6 +25,7 @@ import {
   formatNullable,
   getConfidenceTone,
 } from '../../../shared'
+import { ApiErrorState } from '../ApiErrorState'
 import {
   getClassificationStatusLabel,
   getClassificationStatusTone,
@@ -35,17 +36,25 @@ import styles from './EmailDetailPanel.module.css'
 type EmailDetailPanelProps = {
   data: EmailDetail | undefined
   isLoading: boolean
-  isError: boolean
+  error: unknown
   isPlaceholder: boolean
+  onRetry: () => void
+}
+
+type DownloadFailure = {
+  error: unknown
+  retry: () => Promise<void>
 }
 
 export function EmailDetailPanel({
   data,
   isLoading,
-  isError,
+  error,
   isPlaceholder,
+  onRetry,
 }: EmailDetailPanelProps) {
-  const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [downloadFailure, setDownloadFailure] =
+    useState<DownloadFailure | null>(null)
 
   if (isPlaceholder) {
     return (
@@ -66,22 +75,27 @@ export function EmailDetailPanel({
     )
   }
 
-  if (isError || !data) {
+  if (error || !data) {
     return (
-      <EmptyState
+      <ApiErrorState
         description="Запись могла быть удалена или выбранный record_id некорректен."
+        error={error}
+        onRetry={onRetry}
         title="Письмо не найдено"
       />
     )
   }
 
   async function safelyDownload(action: () => Promise<void>) {
-    setDownloadError(null)
+    setDownloadFailure(null)
 
     try {
       await action()
-    } catch {
-      setDownloadError('Не удалось скачать файл. Проверьте доступ к API.')
+    } catch (downloadError) {
+      setDownloadFailure({
+        error: downloadError,
+        retry: action,
+      })
     }
   }
 
@@ -114,10 +128,13 @@ export function EmailDetailPanel({
         </Button>
       </header>
       <div className={styles.stack}>
-        {downloadError && (
-          <Alert title="Ошибка скачивания" tone="danger">
-            {downloadError}
-          </Alert>
+        {downloadFailure && (
+          <ApiErrorState
+            description="Не удалось скачать файл. Проверьте доступ к API."
+            error={downloadFailure.error}
+            onRetry={() => void safelyDownload(downloadFailure.retry)}
+            title="Ошибка скачивания"
+          />
         )}
 
         <Section className={styles.section} title="Классификация">

@@ -1,8 +1,14 @@
-import { createContext, useContext } from 'react'
+import {
+  createContext,
+  useContext,
+  type Dispatch,
+  type SetStateAction,
+} from 'react'
 
 export type DropdownContextValue = {
+  contentId: string
   open: boolean
-  setOpen: (open: boolean) => void
+  setOpen: Dispatch<SetStateAction<boolean>>
 }
 
 export const DropdownContext = createContext<DropdownContextValue | null>(null)

@@ -12,6 +12,7 @@ import {
   Skeleton,
 } from '../../../shared'
 import { formatDateTime, useIntersectionObserver } from '../../../shared'
+import { ApiErrorState } from '../ApiErrorState'
 import {
   getClassificationClassLabel,
   isClassificationClassCode,
@@ -37,12 +38,13 @@ type EmailListProps = {
   items: EmailListItem[]
   hasNextPage: boolean
   isLoading: boolean
-  isError: boolean
+  error: unknown
   isFetchingNextPage: boolean
   nextCursor: string | null
   selectedId: string | null
   search: string
   onLoadMore: () => void
+  onRetry: () => void
   onSearchChange: (search: string) => void
   onSelect: (recordId: string) => void
 }
@@ -57,12 +59,13 @@ export function EmailList({
   items,
   hasNextPage,
   isLoading,
-  isError,
+  error,
   isFetchingNextPage,
   nextCursor,
   selectedId,
   search,
   onLoadMore,
+  onRetry,
   onSearchChange,
   onSelect,
 }: EmailListProps) {
@@ -124,11 +127,13 @@ export function EmailList({
     )
   }
 
-  if (isError) {
+  if (error) {
     return (
       <Card className={styles.card} title="Письма" variant="muted">
-        <EmptyState
+        <ApiErrorState
           description="Не удалось получить список писем из Results API."
+          error={error}
+          onRetry={onRetry}
           title="Список недоступен"
         />
       </Card>

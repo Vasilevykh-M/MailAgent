@@ -1,13 +1,15 @@
 import type { StatisticsResponse } from '../../../api'
-import { Card, EmptyState, Skeleton } from '../../../shared'
+import { Card, Skeleton } from '../../../shared'
 import { formatInteger } from '../../../shared'
+import { ApiErrorState } from '../ApiErrorState'
 
 import styles from './StatisticsCards.module.css'
 
 type StatisticsCardsProps = {
   data: StatisticsResponse | undefined
   isLoading: boolean
-  isError: boolean
+  error: unknown
+  onRetry: () => void
 }
 
 function countByStatus(data: StatisticsResponse | undefined, status: string) {
@@ -25,7 +27,8 @@ function topClass(data: StatisticsResponse | undefined) {
 export function StatisticsCards({
   data,
   isLoading,
-  isError,
+  error,
+  onRetry,
 }: StatisticsCardsProps) {
   if (isLoading) {
     return (
@@ -40,10 +43,12 @@ export function StatisticsCards({
     )
   }
 
-  if (isError) {
+  if (error) {
     return (
-      <EmptyState
+      <ApiErrorState
         description="Проверьте доступность Results API или параметры периода."
+        error={error}
+        onRetry={onRetry}
         title="Статистика недоступна"
       />
     )
