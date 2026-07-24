@@ -44,6 +44,7 @@ def build_runtime(settings: AgentSettings) -> Runtime:
         results_api=results_api,
         checkpoint_db=settings.checkpoint_db_path,
         pipeline_version=settings.pipeline_version,
+        mark_read_after_success=settings.mail.mark_read_after_success,
     )
     worker = PollingWorker(
         mail=mail,
@@ -54,5 +55,6 @@ def build_runtime(settings: AgentSettings) -> Runtime:
         batch_size=settings.mail.batch_size,
         poll_interval_seconds=settings.mail.poll_interval_seconds,
         max_concurrent_messages=settings.mail.max_concurrent_messages,
+        unread_only=settings.mail.unread_only,
     )
     return Runtime(worker, llm, ocr, results_api, graph)

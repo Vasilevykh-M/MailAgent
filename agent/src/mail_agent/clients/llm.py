@@ -8,8 +8,10 @@ import logging
 import random
 import re
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
-from threading import BoundedSemaphore
+from threading import BoundedSemaphore, Lock, local
 from typing import Any, TypeVar
 
 import httpx
@@ -40,9 +42,36 @@ class LLMClient:
         self._semaphore = BoundedSemaphore(settings.max_concurrent_requests)
         self._failures = 0
         self._open_until = 0.0
+        self._circuit_lock = Lock()
+        self._local = local()
 
     def close(self) -> None:
         self._client.close()
+
+    @contextmanager
+    def message_budget(self, maximum: int) -> Iterator[None]:
+        """Ограничивает логические structured-вызовы в рамках одного письма и потока."""
+
+        previous = getattr(self._local, "remaining_requests", None)
+        self._local.remaining_requests = maximum
+        try:
+            yield
+        finally:
+            if previous is None:
+                try:
+                    del self._local.remaining_requests
+                except AttributeError:  # pragma: no cover - defensive cleanup
+                    pass
+            else:
+                self._local.remaining_requests = previous
+
+    def _consume_message_budget(self) -> None:
+        remaining = getattr(self._local, "remaining_requests", None)
+        if remaining is None:
+            return
+        if remaining <= 0:
+            raise PermanentError("Исчерпан лимит LLM-запросов для одного письма.")
+        self._local.remaining_requests = remaining - 1
 
     def health(self) -> bool:
         base = self.settings.base_url.rstrip("/")
@@ -66,8 +95,9 @@ class LLMClient:
         return models[0]
 
     def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
-        if time.monotonic() < self._open_until:
-            raise ExternalServiceError("LLM временно отключён circuit breaker-ом.")
+        with self._circuit_lock:
+            if time.monotonic() < self._open_until:
+                raise ExternalServiceError("LLM временно отключён circuit breaker-ом.")
         headers = kwargs.pop("headers", {})
         if self.settings.api_key:
             headers["Authorization"] = f"Bearer {self.settings.api_key}"
@@ -84,7 +114,8 @@ class LLMClient:
                 if 400 <= response.status_code < 500:
                     raise PermanentError(f"LLM отклонил запрос (HTTP {response.status_code}).")
                 response.raise_for_status()
-                self._failures = 0
+                with self._circuit_lock:
+                    self._failures = 0
                 log_event(
                     LOGGER,
                     "llm_request_completed",
@@ -100,7 +131,9 @@ class LLMClient:
                 return response
             except (httpx.HTTPError, ExternalServiceError, PermanentError) as exc:
                 last_error = exc
-                self._failures += 1
+                with self._circuit_lock:
+                    self._failures += 1
+                    failures = self._failures
                 retryable = not isinstance(exc, PermanentError) and attempt < self.settings.max_retries
                 log_event(
                     LOGGER,
@@ -117,8 +150,9 @@ class LLMClient:
                     error_type=type(exc).__name__,
                     duration_ms=round((time.perf_counter() - started) * 1000),
                 )
-                if self._failures >= self.settings.circuit_breaker_failures:
-                    self._open_until = time.monotonic() + min(60, 2**self._failures)
+                if failures >= self.settings.circuit_breaker_failures:
+                    with self._circuit_lock:
+                        self._open_until = time.monotonic() + min(60, 2**failures)
                 if retryable:
                     time.sleep(min(10, 0.5 * 2**attempt) + random.uniform(0, 0.25))
                 else:
@@ -181,6 +215,7 @@ class LLMClient:
         images: list[tuple[str, bytes]] | None = None,
         max_tokens: int | None = None,
     ) -> T:
+        self._consume_message_budget()
         started = time.perf_counter()
         schema_json = json.dumps(schema.model_json_schema(), ensure_ascii=False, separators=(",", ":"))
         now = datetime.now(UTC).isoformat(timespec="seconds")

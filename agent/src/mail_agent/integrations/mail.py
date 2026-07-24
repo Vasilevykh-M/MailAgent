@@ -9,7 +9,7 @@ from ..models import MessageReference
 
 
 class MailGateway(Protocol):
-    def list_unread_all(self, mailbox: str, batch_size: int) -> list[MessageReference]: ...
+    def list_unread_all(self, mailbox: str, batch_size: int, *, unread_only: bool = True) -> list[MessageReference]: ...
 
     def fetch_message(self, uid: str, mailbox: str) -> dict[str, Any]: ...
 
@@ -24,19 +24,20 @@ class YandexMailAdapter:
 
         self._service = YandexMailService.from_env(str(env_file))
 
-    def list_unread_all(self, mailbox: str, batch_size: int) -> list[MessageReference]:
+    def list_unread_all(self, mailbox: str, batch_size: int, *, unread_only: bool = True) -> list[MessageReference]:
         result: list[MessageReference] = []
         offset = 0
         # Intentional page loop: batch_size never limits the total queue.
         while True:
+            filters = {"status": "unread"} if unread_only else {}
             page = self._service.list_messages(
                 mailbox=mailbox,
-                status="unread",
                 limit=batch_size,
                 offset=offset,
                 sort_by="date",
                 descending=False,
                 batch_size=batch_size,
+                **filters,
             )
             result.extend(
                 MessageReference(

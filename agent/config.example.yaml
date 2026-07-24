@@ -21,10 +21,14 @@ llm:
   # Коррекция OCR возвращает текст целиком, поэтому её лимит выше общего.
   max_ocr_correction_tokens: 1000
   max_image_bytes_per_request: 4194304
+  # Общий предел логических structured-вызовов LLM на одно письмо.
+  max_structured_requests_per_message: 256
 ocr:
   base_url: http://192.14.88.2:8000
   # При ошибке OCR попытаться извлечь PDF/изображения через VLM.
-  fallback_to_vlm: false
+  fallback_to_vlm: true
+  # Это число повторов после первой попытки: всего будет не более двух запросов OCR.
+  max_retries: 1
 results_api:
   base_url: http://127.0.0.1:8080
   # Ключ остаётся пустым: передавайте RESULTS_API_KEY только через окружение.
@@ -47,6 +51,8 @@ limits:
   # Обычное тело письма длиннее этого значения суммаризируется по фрагментам.
   message_body_chunk_size: 3000
   max_message_body_summary_chunks: 24
+  # Общий лимит фрагментов по всем уровням цепочки пересылки.
+  max_forwarded_summary_chunks: 24
 dashboard:
   # Для trusted LAN можно указать private/VPN IP сервера, например 192.168.88.32.
   # Публичные адреса и 0.0.0.0 запрещены.

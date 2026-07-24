@@ -303,6 +303,26 @@ def test_forwarded_chain_is_summarized_by_each_level_before_final_summary() -> N
     assert final_call[1]["forwarded_chain"]["summary_ru"] == "Краткое содержание"
 
 
+def test_forwarded_chain_has_a_global_chunk_limit_and_visible_warning() -> None:
+    settings = AgentSettings()
+    settings.limits.chunk_size = 1_000
+    settings.limits.max_forwarded_summary_chunks = 2
+    llm = FakeLLM()
+    service = AnalysisService(settings, llm, ocr=None)  # type: ignore[arg-type]
+    body = (
+        "[Внешний комментарий переславшего]\n"
+        + "a" * 2_000
+        + "\n[Пересланное сообщение 1]\n[Содержимое]\n"
+        + "b" * 2_000
+    )
+
+    result = service.summarize({"is_forwarded": True}, body, [], [])
+
+    chunk_calls = [call for call in llm.calls if call[0] == FORWARDED_MESSAGE_CHUNK_SYSTEM]
+    assert len(chunk_calls) == 2
+    assert any("превышает лимит анализа" in warning for warning in result.warnings_ru)
+
+
 def test_unreadable_attachment_is_always_reported_in_final_summary() -> None:
     settings = AgentSettings()
     llm = FakeLLM()

@@ -9,13 +9,14 @@ import tempfile
 import time
 import uuid
 from collections.abc import Callable
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, cast
 
 import fitz
 from langgraph.graph import END, START, StateGraph
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ..attachments.parsers import ParsedText, extract_programmatic, sanitize_html
 from ..attachments.validation import build_metadata
@@ -81,8 +82,15 @@ _ATTACHMENT_BYTE_NODES = {
 class VisionResult(BaseModel):
     """Минимальный контракт VLM для аварийного извлечения текста."""
 
-    text: str = ""
+    text: str
     confidence: float = Field(ge=0, le=1)
+
+    @field_validator("text")
+    @classmethod
+    def non_empty_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("VLM не вернула читаемый текст.")
+        return value
 
 
 class ResultsGateway(Protocol):
@@ -99,9 +107,11 @@ class MessageGraph:
         results_api: ResultsGateway,
         checkpoint_db: Path,
         pipeline_version: str,
+        mark_read_after_success: bool = True,
     ) -> None:
         self.mail, self.repository, self.analysis, self.results_api = mail, repository, analysis, results_api
         self.pipeline_version = pipeline_version
+        self.mark_read_after_success = mark_read_after_success
         checkpoint_db.parent.mkdir(parents=True, exist_ok=True)
         # Import is delayed so local non-AI commands still produce a clear dependency error.
         from langgraph.checkpoint.sqlite import SqliteSaver
@@ -189,6 +199,8 @@ class MessageGraph:
         paths: dict[str, str] = {}
         for index, attachment in enumerate(values):
             if not isinstance(attachment, dict):
+                continue
+            if attachment.get("within_size_limit") is False:
                 continue
             expected = attachment.get("sha256")
             payload = payloads[index] if isinstance(payloads, list) and index < len(payloads) else {}
@@ -467,6 +479,16 @@ class MessageGraph:
         return stage in _ATTACHMENT_BYTE_NODES
 
     def run(self, reference: MessageReference, temporary_dir: Path) -> MailProcessingState:
+        budget_factory = getattr(getattr(self.analysis, "llm", None), "message_budget", None)
+        budget = (
+            budget_factory(self.analysis.settings.llm.max_structured_requests_per_message)
+            if callable(budget_factory)
+            else nullcontext()
+        )
+        with budget:
+            return self._run(reference, temporary_dir)
+
+    def _run(self, reference: MessageReference, temporary_dir: Path) -> MailProcessingState:
         stable = record_id(reference.mailbox, reference.uid, reference.message_id)
         started = time.perf_counter()
         self.repository.ensure(reference.mailbox, reference.uid, reference.message_id, self.pipeline_version)
@@ -627,6 +649,11 @@ class MessageGraph:
         if state.get("status") == "completed":
             return {}
         raw_message = self.mail.fetch_message(state["uid"], state["mailbox"])
+        raw_bytes = raw_message.get("raw_bytes")
+        if not isinstance(raw_bytes, bytes):
+            raise PermanentError("Почтовый адаптер не вернул исходный MIME-файл.")
+        if len(raw_bytes) > self.analysis.settings.mail.max_message_size:
+            raise PermanentError("Фактический размер MIME-письма превышает настроенный лимит.")
         message, payloads, raw_path = self._store_attachment_payloads(raw_message, Path(state["temporary_dir"]))
         stable = state["record_id"]
         self.repository.message_fetched(stable, message)
@@ -841,7 +868,15 @@ class MessageGraph:
                     len(parsed.text),
                 )
                 try:
-                    plan = self.analysis.plan(meta, parsed)
+                    if parsed.usable:
+                        plan = AttachmentPlan(
+                            tool="programmatic",
+                            confidence=1,
+                            reason="Local parser produced usable text.",
+                            validation_warnings=list(parsed.warnings),
+                        )
+                    else:
+                        plan = self.analysis.plan(meta, parsed)
                 except OCRServiceError as exc:
                     if not self.analysis.settings.ocr.fallback_to_vlm:
                         plan = AttachmentPlan(
@@ -1109,10 +1144,14 @@ class MessageGraph:
             if isinstance(item, list | tuple) and len(item) == 2
         ]
         attachments = state.get("attachments", [])
+        available_paths = self._hydrate_attachment_paths(state)
         file_entries: list[dict[str, Any]] = []
         if isinstance(attachments, list):
             for index, item in enumerate(attachments):
                 if not isinstance(item, dict):
+                    continue
+                digest = str(item.get("sha256") or "")
+                if digest not in available_paths:
                     continue
                 file_entries.append(
                     {
@@ -1122,7 +1161,7 @@ class MessageGraph:
                         "content_type": str(item.get("content_type") or "application/octet-stream"),
                         "detected_content_type": str(item.get("detected_content_type") or "application/octet-stream"),
                         "size": int(item.get("size") or 0),
-                        "sha256": str(item.get("sha256") or ""),
+                        "sha256": digest,
                         "is_inline": bool(item.get("is_inline")),
                         "content_id": item.get("content_id"),
                     }
@@ -1236,7 +1275,8 @@ class MessageGraph:
         return {"status": "result_committed"}
 
     def _mark_read(self, state: MailProcessingState) -> dict[str, Any]:
-        self.mail.mark_read(state["uid"], state["mailbox"])
+        if self.mark_read_after_success:
+            self.mail.mark_read(state["uid"], state["mailbox"])
         return {}
 
     def _complete(self, state: MailProcessingState) -> dict[str, Any]:

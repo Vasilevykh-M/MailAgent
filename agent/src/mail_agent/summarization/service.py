@@ -366,21 +366,36 @@ class AnalysisService:
         if not sections:
             return None
         size = min(self.settings.limits.chunk_size, max(1_000, self.settings.llm.max_text_chars_per_request // 2))
-        levels: list[AttachmentDigest] = []
-        for level, section in enumerate(sections, 1):
-            chunks = [section[offset : offset + size] for offset in range(0, len(section), size)]
-            digests = [
+        chunk_values = [
+            (level, number, len(chunks), chunk)
+            for level, section in enumerate(sections, 1)
+            for chunks in [[section[offset : offset + size] for offset in range(0, len(section), size)]]
+            for number, chunk in enumerate(chunks, 1)
+        ]
+        maximum = self.settings.limits.max_forwarded_summary_chunks
+        if len(chunk_values) > maximum:
+            if maximum == 1:
+                selected_indices = [0]
+            else:
+                selected_indices = sorted(
+                    {round(index * (len(chunk_values) - 1) / (maximum - 1)) for index in range(maximum)}
+                )
+            chunk_values = [chunk_values[index] for index in selected_indices]
+        grouped: dict[int, list[AttachmentDigest]] = {}
+        for level, number, total, chunk in chunk_values:
+            grouped.setdefault(level, []).append(
                 self._digest(
                     FORWARDED_MESSAGE_CHUNK_SYSTEM,
                     {
                         "chain_level": level,
                         "chunk_number": number,
-                        "chunk_count": len(chunks),
+                        "chunk_count": total,
                         "text": chunk,
                     },
                 )
-                for number, chunk in enumerate(chunks, 1)
-            ]
+            )
+        levels: list[AttachmentDigest] = []
+        for level, digests in grouped.items():
             levels.append(
                 self._reduce_digests(
                     {"kind": "forwarded_email_level", "chain_level": level},
@@ -393,6 +408,12 @@ class AnalysisService:
             levels,
             FORWARDED_MESSAGE_REDUCE_SYSTEM,
         )
+        if len(chunk_values) < sum(max(1, (len(section) + size - 1) // size) for section in sections):
+            warning = (
+                "Цепочка пересылки превышает лимит анализа; "
+                f"использовано {len(chunk_values)} равномерно выбранных фрагментов."
+            )
+            chain.warnings_ru = [*chain.warnings_ru[:3], warning]
         return self._digest_evidence(chain)
 
     def _summary_attachment(self, attachment: dict[str, Any], text_limit: int) -> dict[str, Any]:
@@ -570,6 +591,12 @@ class AnalysisService:
         # подставлять в ячейку вместо сводки. До ручной проверки выполняются
         # повторные попытки с более компактным контрактом.
         summary = self._generate_final_summary(evidence)
+        forwarded_warnings = forwarded_chain.get("warnings_ru", []) if isinstance(forwarded_chain, dict) else []
+        if isinstance(forwarded_warnings, list):
+            missing = [str(item) for item in forwarded_warnings if str(item) not in summary.warnings_ru]
+            if missing:
+                summary = summary.model_copy(deep=True)
+                summary.warnings_ru.extend(missing)
         if body_sampling_warning and body_sampling_warning not in summary.warnings_ru:
             summary = summary.model_copy(deep=True)
             summary.warnings_ru.append(body_sampling_warning)

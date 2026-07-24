@@ -16,7 +16,8 @@ class FakeMail:
         self.calls = 0
         self.read: list[tuple[str, str]] = []
 
-    def list_unread_all(self, mailbox: str, batch_size: int) -> list[MessageReference]:
+    def list_unread_all(self, mailbox: str, batch_size: int, *, unread_only: bool = True) -> list[MessageReference]:
+        del mailbox, batch_size, unread_only
         value = self.batches[min(self.calls, len(self.batches) - 1)]
         self.calls += 1
         return value

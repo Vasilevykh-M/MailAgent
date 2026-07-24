@@ -24,9 +24,11 @@ class Page:
 class Service:
     def __init__(self) -> None:
         self.offsets = []
+        self.statuses = []
 
     def list_messages(self, **kwargs):
         self.offsets.append(kwargs["offset"])
+        self.statuses.append(kwargs.get("status"))
         return Page([Item(1), Item(2)] if kwargs["offset"] == 0 else [Item(3)], kwargs["offset"] == 0, 2)
 
 
@@ -36,3 +38,15 @@ def test_adapter_reads_all_pages_not_just_batch() -> None:
     items = adapter.list_unread_all("INBOX", 2)
     assert [item.uid for item in items] == ["1", "2", "3"]
     assert adapter._service.offsets == [0, 2]
+    assert adapter._service.statuses == ["unread", "unread"]
+
+
+def test_adapter_can_list_all_messages_when_unread_filter_is_disabled() -> None:
+    adapter = object.__new__(YandexMailAdapter)
+    service = Service()
+    adapter._service = service
+
+    adapter.list_unread_all("INBOX", 2, unread_only=False)
+
+    assert service.offsets == [0, 2]
+    assert service.statuses == [None, None]

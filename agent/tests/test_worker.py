@@ -66,3 +66,33 @@ def test_deferred_permanent_messages_do_not_keep_worker_in_busy_loop(tmp_path, r
 
     assert worker.once() == 0
     assert graph.seen == []
+
+
+def test_worker_passes_unread_setting_to_mail_gateway(tmp_path, repository, references) -> None:
+    class RecordingMail(FakeMail):
+        unread_values: list[bool]
+
+        def __init__(self) -> None:
+            super().__init__([references])
+            self.unread_values = []
+
+        def list_unread_all(self, mailbox, batch_size, *, unread_only=True):
+            self.unread_values.append(unread_only)
+            return super().list_unread_all(mailbox, batch_size, unread_only=unread_only)
+
+    mail = RecordingMail()
+    worker = PollingWorker(
+        mail=mail,
+        graph=FakeGraph(),
+        repository=repository,
+        work_dir=tmp_path,
+        mailbox="INBOX",
+        batch_size=50,
+        poll_interval_seconds=1,
+        max_concurrent_messages=1,
+        unread_only=False,
+    )
+
+    worker.once()
+
+    assert mail.unread_values == [False]

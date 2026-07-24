@@ -9,12 +9,87 @@
 выбирает максимум `limits.max_message_body_summary_chunks` фрагментов и добавляет
 явное предупреждение в результат.
 
+Для цепочки пересылки действует общий лимит
+`limits.max_forwarded_summary_chunks` по всем уровням. Если лимит достигнут,
+фрагменты выбираются равномерно, а в итог добавляется предупреждение. Вложения
+обрабатываются последовательно; значение `limits.max_parallel_attachments`
+намеренно допускает только `1`, чтобы временные файлы и checkpoint письма
+оставались согласованными.
+
+Дополнительно `llm.max_structured_requests_per_message` ограничивает суммарное
+число логических LLM-операций для одного письма, включая выбор инструмента,
+визуальное извлечение, коррекцию OCR и суммаризацию. Исчерпание лимита создаёт
+результат для ручной проверки вместо неограниченного продолжения запросов.
+
 ## Поток
 
-```text
-unread pages → fetch(mark_read=False) → MIME во временный .eml
-→ normalise / attachments / OCR / LLM → Results API multipart commit
-→ result_committed → mark \Seen → completed
+```mermaid
+flowchart TD
+    START([Запуск worker]) --> RECOVER[Освободить узлы<br/>со статусом running после прерывания]
+    RECOVER --> POLL[Получить все непрочитанные письма<br/>из INBOX]
+    POLL --> EACH[Выбрать следующее письмо<br/>в хронологическом порядке]
+    EACH --> ID[Создать record_id<br/>mailbox + UID + Message-ID]
+
+    ID --> CHECK[check_idempotency]
+    CHECK --> STATUS{Состояние записи SQLite}
+    STATUS -->|completed| ALREADY([Письмо уже обработано])
+    STATUS -->|result_committed| SEEN[mark_message_as_read<br/>поставить флаг Seen]
+    STATUS -->|новая или повторяемая| FETCH[fetch_message<br/>получить MIME без флага Seen]
+
+    FETCH --> NORMALIZE[normalize_message<br/>очистить и нормализовать тело<br/>выделить цепочку пересылки]
+    NORMALIZE --> COLLECT[collect_attachment_metadata<br/>проверить MIME, размер, сигнатуру<br/>сохранить файлы только во временную папку]
+    COLLECT --> PLAN[plan_attachments<br/>выбрать безопасный способ извлечения]
+
+    subgraph ATTACHMENTS[Обработка каждого вложения]
+        PLAN --> TOOL{Выбранный инструмент}
+        TOOL -->|programmatic| LOCAL[Локальный парсер<br/>DOCX, XLSX, PDF с text layer и др.]
+        TOOL -->|ocr| OCR1[OCR: первая попытка]
+        OCR1 -->|успех| OCRTEXT[Текст OCR]
+        OCR1 -->|ошибка или timeout| OCR2[OCR: единственный повтор]
+        OCR2 -->|успех| OCRTEXT
+        OCR2 -->|ошибка или timeout| VLM{Включён fallback_to_vlm<br/>и формат поддержан?}
+        TOOL -->|vision| VLMEXTRACT[VLM: извлечь видимый текст<br/>из ограниченного числа страниц]
+        VLM -->|PDF, JPEG, PNG или WebP| VLMEXTRACT
+        VLM -->|нет| SKIP[Пропустить вложение]
+        VLMEXTRACT -->|валидный непустой JSON| VLMText[Текст VLM]
+        VLMEXTRACT -->|невалидный, пустой<br/>или недоступный ответ| SKIP
+        TOOL -->|skip| SKIP
+        LOCAL --> EXTRACTED[Извлечённый текст]
+        OCRTEXT --> EXTRACTED
+        VLMText --> EXTRACTED
+        SKIP --> NOTICE[Добавить безопасное предупреждение<br/>и отметку ручной проверки]
+    end
+
+    EXTRACTED --> VALIDATE[validate_extractions<br/>при низкой уверенности OCR — коррекция LLM]
+    VALIDATE --> ATTACHMENT_SUMMARY[Сводки вложений]
+    NOTICE --> ATTACHMENT_SUMMARY
+    ATTACHMENT_SUMMARY --> SUMMARY[summarize_message<br/>суммаризация тела, пересылки<br/>и результатов вложений]
+    SUMMARY --> PREPARE[prepare_api_record]
+    PREPARE --> PERSIST[persist_result_via_api<br/>multipart в Results API]
+    PERSIST --> COMMIT[commit_processing_state<br/>status = result_committed]
+    COMMIT --> SEEN
+    SEEN --> COMPLETE[complete<br/>status = completed]
+    COMPLETE --> NEXT{Есть ещё письма?}
+    NEXT -->|да| EACH
+    NEXT -->|нет| WAIT[Ожидать poll_interval_seconds]
+    WAIT --> POLL
+
+    subgraph RECOVERY[Durable recovery и ошибки]
+        JOURNAL[(SQLite: запись письма,<br/>журнал узлов и checkpoint)]
+        RETRY[retryable_error<br/>backoff и повтор следующего poll]
+        MANUAL[manual_review<br/>результат сохранён с предупреждением]
+    end
+
+    CHECK -. читает .-> JOURNAL
+    FETCH -. checkpoint после каждого узла .-> JOURNAL
+    NORMALIZE -.-> JOURNAL
+    COLLECT -.-> JOURNAL
+    PLAN -.-> JOURNAL
+    VALIDATE -.-> JOURNAL
+    COMMIT -.-> JOURNAL
+    NOTICE --> MANUAL
+    PERSIST -->|временная ошибка| RETRY
+    RETRY --> CHECK
 ```
 
 `record_id` зависит от mailbox, UID и Message-ID. Он служит ключом SQLite и HTTP idempotency key. `--reprocess` сохраняет тот же record ID и увеличивает `processing_generation`; API не разрешает старому generation перезаписать новое.
@@ -73,6 +148,17 @@ results_api:
   max_retries: 3
   verify_tls: true
 ```
+
+`mail.unread_only: false` разрешает обход всех писем папки, а
+`mail.mark_read_after_success: false` оставляет успешно обработанное письмо
+непрочитанным. Повторной обработки при этом не происходит благодаря SQLite
+idempotency state.
+
+OCR выполняет не более двух HTTP-запросов к одному вложению: `ocr.max_retries: 1`
+означает один повтор после первой попытки. Для PDF, JPEG, PNG и WebP после
+исчерпания OCR автоматически используется VLM (`ocr.fallback_to_vlm: true`).
+Если VLM не вернёт валидный непустой структурированный текст, вложение получает
+статус `skipped`, а письмо продолжает обработку с отметкой о ручной проверке.
 
 ## Запуск
 

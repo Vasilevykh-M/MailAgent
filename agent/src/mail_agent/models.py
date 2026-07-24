@@ -35,6 +35,7 @@ class AttachmentMeta(BaseModel):
     page_count: int | None = None
     has_text_layer: bool | None = None
     extracted_text_length: int = 0
+    within_size_limit: bool = True
 
 
 class AttachmentPlan(BaseModel):

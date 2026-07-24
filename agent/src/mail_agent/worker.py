@@ -31,10 +31,12 @@ class PollingWorker:
         batch_size: int,
         poll_interval_seconds: int,
         max_concurrent_messages: int,
+        unread_only: bool = True,
     ) -> None:
         self.mail, self.graph, self.repository = mail, graph, repository
         self.work_dir, self.mailbox, self.batch_size = work_dir, mailbox, batch_size
         self.poll_interval_seconds, self.max_concurrent_messages = poll_interval_seconds, max_concurrent_messages
+        self.unread_only = unread_only
         self.stop_event = threading.Event()
 
     def stop(self) -> None:
@@ -74,7 +76,7 @@ class PollingWorker:
             with tempfile.TemporaryDirectory(prefix="message-", dir=self.work_dir) as directory:
                 result = self.graph.run(reference, Path(directory))
         finally:
-            self.repository.current_record(None)
+            self.repository.current_record(None, expected=stable)
         status = str(result.get("status", "retryable_error"))
         log_event(
             LOGGER,
@@ -97,7 +99,9 @@ class PollingWorker:
         started = time.perf_counter()
         self.repository.poll_started()
         log_event(LOGGER, "mail_poll_started", component="worker", mailbox=self.mailbox)
-        messages = self._oldest_first(self.mail.list_unread_all(self.mailbox, self.batch_size))
+        messages = self._oldest_first(
+            self.mail.list_unread_all(self.mailbox, self.batch_size, unread_only=self.unread_only)
+        )
         if not messages:
             log_event(
                 LOGGER,

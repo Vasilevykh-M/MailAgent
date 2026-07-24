@@ -97,6 +97,13 @@ class DashboardStore:
                 runtime = connection.execute("SELECT * FROM runtime_status WHERE singleton=1").fetchone()
                 if runtime is not None:
                     result["runtime"] = dict(runtime)
+                active = connection.execute(
+                    """SELECT records.* FROM runtime_active_records AS active
+                       JOIN processing_records AS records ON records.record_id=active.record_id
+                       ORDER BY active.updated_at DESC"""
+                ).fetchall()
+                result["runtime"]["active_record_count"] = len(active)
+                result["active"] = [self._record(row) for row in active]
                 worker_running = result["runtime"].get("worker_state") == "running"
                 current_id = result["runtime"].get("current_record_id") if worker_running else None
                 if isinstance(current_id, str):

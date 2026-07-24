@@ -45,12 +45,14 @@ class LLMSettings(_Model):
     max_ocr_correction_tokens: PositiveInt = 3_000
     max_image_bytes_per_request: PositiveInt = 4 * 1024 * 1024
     circuit_breaker_failures: PositiveInt = 3
+    max_structured_requests_per_message: PositiveInt = 256
 
 
 class OCRSettings(_Model):
     base_url: str = "http://127.0.0.1:8000"
     timeout_seconds: PositiveInt = 300
-    max_retries: int = Field(default=3, ge=0, le=10)
+    # Значение задаёт число повторов после первого обращения: 1 означает максимум два запроса.
+    max_retries: int = Field(default=1, ge=0, le=1)
     max_concurrent_requests: PositiveInt = 1
     capabilities_cache_ttl_seconds: PositiveInt = 300
     fallback_to_vlm: bool = True
@@ -98,11 +100,14 @@ class LimitsSettings(_Model):
     max_xlsx_sheets: PositiveInt = 20
     max_xlsx_rows: PositiveInt = 10_000
     max_xlsx_columns: PositiveInt = 100
-    max_parallel_attachments: PositiveInt = 1
+    # Обработка вложений намеренно последовательна: временные пути и checkpoint
+    # одного письма образуют единый транзакционный поток.
+    max_parallel_attachments: int = Field(default=1, ge=1, le=1)
     chunk_size: PositiveInt = 4_000
     max_attachment_summary_chunks: PositiveInt = 24
     message_body_chunk_size: PositiveInt = 3_000
     max_message_body_summary_chunks: PositiveInt = 24
+    max_forwarded_summary_chunks: PositiveInt = 24
 
 
 class RetrySettings(_Model):
@@ -176,6 +181,7 @@ _ENV: dict[str, tuple[str, ...]] = {
     "MAILBOX": ("mail", "mailbox"),
     "POLL_INTERVAL_SECONDS": ("mail", "poll_interval_seconds"),
     "MAIL_BATCH_SIZE": ("mail", "batch_size"),
+    "MAIL_UNREAD_ONLY": ("mail", "unread_only"),
     "MAX_CONCURRENT_MESSAGES": ("mail", "max_concurrent_messages"),
     "MARK_READ_AFTER_SUCCESS": ("mail", "mark_read_after_success"),
     "LLM_BASE_URL": ("llm", "base_url"),
@@ -188,8 +194,10 @@ _ENV: dict[str, tuple[str, ...]] = {
     "LLM_MAX_COMPLETION_TOKENS": ("llm", "max_completion_tokens"),
     "LLM_MAX_OCR_CORRECTION_TOKENS": ("llm", "max_ocr_correction_tokens"),
     "LLM_MAX_IMAGE_BYTES_PER_REQUEST": ("llm", "max_image_bytes_per_request"),
+    "LLM_MAX_STRUCTURED_REQUESTS_PER_MESSAGE": ("llm", "max_structured_requests_per_message"),
     "MESSAGE_BODY_CHUNK_SIZE": ("limits", "message_body_chunk_size"),
     "MAX_MESSAGE_BODY_SUMMARY_CHUNKS": ("limits", "max_message_body_summary_chunks"),
+    "MAX_FORWARDED_SUMMARY_CHUNKS": ("limits", "max_forwarded_summary_chunks"),
     "OCR_BASE_URL": ("ocr", "base_url"),
     "OCR_TIMEOUT_SECONDS": ("ocr", "timeout_seconds"),
     "OCR_MAX_RETRIES": ("ocr", "max_retries"),

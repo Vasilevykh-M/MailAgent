@@ -4,12 +4,14 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from openpyxl import Workbook
+from pydantic import ValidationError
 
 from mail_agent.attachments import parsers
 from mail_agent.attachments.parsers import extract_programmatic, sanitize_html
-from mail_agent.attachments.validation import detect_content_type, safe_filename
-from mail_agent.config import LimitsSettings, load_settings
+from mail_agent.attachments.validation import build_metadata, detect_content_type, safe_filename
+from mail_agent.config import AgentSettings, LimitsSettings, OCRSettings, load_settings
 
 
 def test_environment_has_precedence_over_yaml(tmp_path: Path) -> None:
@@ -18,6 +20,12 @@ def test_environment_has_precedence_over_yaml(tmp_path: Path) -> None:
     settings = load_settings(config, {"MAILBOX": "INBOX", "MAIL_BATCH_SIZE": "7"})
     assert settings.mail.mailbox == "INBOX"
     assert settings.mail.batch_size == 7
+
+
+def test_ocr_is_limited_to_two_total_requests() -> None:
+    assert AgentSettings().ocr.max_retries == 1
+    with pytest.raises(ValidationError):
+        OCRSettings(max_retries=2)
 
 
 def test_shared_dotenv_supplies_writer_key_and_results_api_address(tmp_path: Path) -> None:
@@ -104,6 +112,24 @@ def test_legacy_xls_uses_its_actual_mime_type() -> None:
 
 def test_legacy_doc_uses_its_actual_mime_type() -> None:
     assert detect_content_type(b"\xd0\xcf\x11\xe0", "application/octet-stream", ".doc") == "application/msword"
+
+
+def test_attachment_signature_must_match_extension(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="signature"):
+        build_metadata(
+            {
+                "filename": "not-really.pdf",
+                "content_type": "application/pdf",
+                "data": b"plain text",
+            },
+            tmp_path,
+            LimitsSettings(),
+        )
+
+
+def test_parallel_attachment_setting_rejects_unsupported_value() -> None:
+    with pytest.raises(ValidationError):
+        LimitsSettings(max_parallel_attachments=2)
 
 
 def test_doc_uses_local_converter_without_opening_office(tmp_path: Path, monkeypatch) -> None:

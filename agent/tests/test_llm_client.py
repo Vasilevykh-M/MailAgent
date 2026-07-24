@@ -156,3 +156,26 @@ def test_structured_ignores_reasoning_wrapper_before_valid_json() -> None:
         client.close()
 
     assert result.summary_ru == "Готово"
+
+
+def test_structured_message_budget_stops_request_amplification() -> None:
+    requests = 0
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"summary_ru":"Готово","confidence":0.9}'}}]},
+        )
+
+    client = _client(httpx.MockTransport(handler))
+    try:
+        with client.message_budget(1):
+            client.structured("Return JSON.", "first", Result)
+            with pytest.raises(PermanentError, match="лимит LLM-запросов"):
+                client.structured("Return JSON.", "second", Result)
+    finally:
+        client.close()
+
+    assert requests == 1

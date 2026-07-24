@@ -4,9 +4,12 @@ import logging
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+from pydantic import ValidationError
+
 from mail_agent.config import AgentSettings, LimitsSettings, RetrySettings
-from mail_agent.exceptions import ExternalServiceError, OCRServiceError, PermanentError
-from mail_agent.graph.builder import MessageGraph
+from mail_agent.exceptions import ExternalServiceError, LLMResponseFormatError, OCRServiceError, PermanentError
+from mail_agent.graph.builder import MessageGraph, VisionResult
 from mail_agent.models import AttachmentMeta, AttachmentPlan, FinalSummary, MessageReference
 from mail_agent.storage.processing_repository import ProcessingRepository, record_id
 from mail_agent.summarization.classification import EmailClassification
@@ -116,6 +119,11 @@ class VisionLLM:
         return SimpleNamespace(text="Текст от VLM", confidence=0.7)
 
 
+class InvalidVisionLLM:
+    def structured(self, *args, **kwargs):
+        raise LLMResponseFormatError("invalid VLM response")
+
+
 class FallbackAnalysis:
     def __init__(self) -> None:
         self.settings = AgentSettings()
@@ -164,6 +172,18 @@ class BinaryAttachmentMail(Mail):
         ]
         message["text_plain"] = "private-body-marker-must-not-reach-logs"
         return message
+
+
+class OversizedAttachmentMail(Mail):
+    def fetch_message(self, uid: str, mailbox: str):
+        message = super().fetch_message(uid, mailbox)
+        message["attachments"] = [{"filename": "large.txt", "content_type": "text/plain", "data": b"too-large"}]
+        return message
+
+
+class OversizedAttachmentAnalysis(Analysis):
+    settings = AgentSettings()
+    settings.limits.max_attachment_size = 4
 
 
 class ProgrammaticAttachmentAnalysis(Analysis):
@@ -254,6 +274,74 @@ def test_langgraph_commits_api_before_seen_and_preserves_duplicate_headers(tmp_p
     assert state["message_metadata"]["headers"] == [["X", "Y"], ["X", "Z"]]
     assert state["summary"]["classification"]["status"] == "classified"
     assert results_api.payloads[-1]["agent_result"]["summary"]["classification"]["status"] == "classified"
+
+
+def test_mark_read_can_be_disabled_without_losing_completed_state(tmp_path) -> None:
+    mail = Mail()
+    repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
+    graph = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=Analysis(),
+        results_api=ResultsAPI(mail.events),
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+        mark_read_after_success=False,
+    )
+    try:
+        state = graph.run(MessageReference(uid="1", mailbox="INBOX", message_id="<one>"), tmp_path)
+    finally:
+        graph.close()
+
+    assert state["status"] == "completed"
+    assert mail.events == ["fetch", "api"]
+
+
+def test_oversized_attachment_is_reported_but_not_required_in_multipart(tmp_path) -> None:
+    mail = OversizedAttachmentMail()
+    repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
+    results_api = ResultsAPI(mail.events)
+    graph = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=OversizedAttachmentAnalysis(),
+        results_api=results_api,
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+    )
+    try:
+        state = graph.run(MessageReference(uid="1", mailbox="INBOX", message_id="<one>"), tmp_path)
+    finally:
+        graph.close()
+
+    assert state["status"] == "completed"
+    assert state["attachment_results"][0]["status"] == "skipped"
+    assert results_api.payloads[-1]["files"] == []
+    assert results_api.payloads[-1]["agent_result"]["attachment_count"] == 0
+    assert any("превышен лимит" in warning for warning in state["warnings"])
+
+
+def test_fetch_rejects_actual_mime_larger_than_limit(tmp_path) -> None:
+    mail = Mail()
+    repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
+    analysis = Analysis()
+    analysis.settings = SimpleNamespace(limits=LimitsSettings(), mail=SimpleNamespace(max_message_size=4))
+    graph = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=analysis,
+        results_api=ResultsAPI(mail.events),
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+    )
+    try:
+        state = graph.run(MessageReference(uid="1", mailbox="INBOX", message_id="<one>", size_bytes=0), tmp_path)
+    finally:
+        graph.close()
+
+    assert state["status"] == "permanent_error"
+    assert state["failed_stage"] == "fetch_message"
+    assert mail.events == ["fetch"]
 
 
 def test_langgraph_recovery_after_result_commit_retries_only_seen(tmp_path) -> None:
@@ -455,6 +543,51 @@ def test_ocr_service_failure_uses_vlm_fallback_for_image(tmp_path) -> None:
     assert any("извлечён через VLM" in warning for warning in processed["warnings"])
     assert analysis.llm.calls[0]["images"] == [("image/png", b"safe test image")]
     assert analysis.llm.calls[0]["max_tokens"] == analysis.settings.llm.max_ocr_correction_tokens
+
+
+def test_ocr_failure_skips_attachment_after_invalid_vlm_result(tmp_path) -> None:
+    mail = Mail()
+    repository = ProcessingRepository(tmp_path / "state.sqlite", RetrySettings())
+    analysis = FallbackAnalysis()
+    analysis.llm = InvalidVisionLLM()
+    graph = MessageGraph(
+        mail=mail,
+        repository=repository,
+        analysis=analysis,
+        results_api=ResultsAPI(mail.events),
+        checkpoint_db=tmp_path / "check.sqlite",
+        pipeline_version="1",
+    )
+    attachment = _image_attachment(tmp_path / "invalid-vlm.png")
+    stable = repository.ensure("INBOX", "1", "<one>", "1")
+    plan = AttachmentPlan(
+        tool="ocr",
+        language="ru",
+        ocr_task="ocr",
+        ocr_model="pp-ocrv5",
+        confidence=0.1,
+        reason="scanned image",
+    )
+    try:
+        result = graph._process(
+            {
+                "record_id": stable,
+                "attachments": [attachment.model_dump(mode="json")],
+                "attachment_plans": [plan.model_dump(mode="json")],
+            }
+        )
+    finally:
+        graph.close()
+
+    processed = result["attachment_results"][0]
+    assert processed["status"] == "skipped"
+    assert processed["raw_extracted_text"] is None
+    assert any("требуется ручная проверка" in warning for warning in processed["warnings"])
+
+
+def test_empty_vlm_text_is_not_a_valid_extraction() -> None:
+    with pytest.raises(ValidationError):
+        VisionResult.model_validate({"text": "  ", "confidence": 0})
 
 
 def test_ocr_capabilities_failure_plans_vlm_fallback(tmp_path) -> None:

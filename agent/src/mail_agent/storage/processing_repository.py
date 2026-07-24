@@ -97,6 +97,9 @@ class ProcessingRepository:
                   last_poll_message_count INTEGER, last_poll_processed_count INTEGER,
                   updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS runtime_active_records (
+                  record_id TEXT PRIMARY KEY, started_at TEXT NOT NULL, updated_at TEXT NOT NULL
+                );
                 """
             )
             existing = {str(row["name"]) for row in connection.execute("PRAGMA table_info(processing_records)")}
@@ -600,12 +603,14 @@ class ProcessingRepository:
 
     def worker_started(self) -> None:
         with self._connection() as connection:
+            connection.execute("DELETE FROM runtime_active_records")
             connection.execute(
                 "UPDATE runtime_status SET worker_state='running', updated_at=? WHERE singleton=1", (self._now(),)
             )
 
     def worker_stopped(self) -> None:
         with self._connection() as connection:
+            connection.execute("DELETE FROM runtime_active_records")
             connection.execute(
                 """UPDATE runtime_status
                    SET worker_state='stopped', current_record_id=NULL, updated_at=? WHERE singleton=1""",
@@ -631,11 +636,32 @@ class ProcessingRepository:
                 (now, message_count, processed_count, now),
             )
 
-    def current_record(self, stable: str | None) -> None:
+    def current_record(self, stable: str | None, *, expected: str | None = None) -> None:
         with self._connection() as connection:
+            now = self._now()
+            if stable is not None:
+                connection.execute(
+                    """INSERT INTO runtime_active_records(record_id, started_at, updated_at) VALUES (?, ?, ?)
+                       ON CONFLICT(record_id) DO UPDATE SET updated_at=excluded.updated_at""",
+                    (stable, now, now),
+                )
+                connection.execute(
+                    "UPDATE runtime_status SET current_record_id=?, updated_at=? WHERE singleton=1",
+                    (stable, now),
+                )
+                return
+            if expected is not None:
+                connection.execute("DELETE FROM runtime_active_records WHERE record_id=?", (expected,))
+            next_active = connection.execute(
+                "SELECT record_id FROM runtime_active_records ORDER BY updated_at DESC LIMIT 1"
+            ).fetchone()
+            current = str(next_active["record_id"]) if next_active is not None else None
+            if expected is None:
+                connection.execute("DELETE FROM runtime_active_records")
+                current = None
             connection.execute(
                 "UPDATE runtime_status SET current_record_id=?, updated_at=? WHERE singleton=1",
-                (stable, self._now()),
+                (current, now),
             )
 
     def find_by_uid(self, mailbox: str, uid: str) -> list[dict[str, Any]]:

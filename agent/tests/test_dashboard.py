@@ -59,3 +59,23 @@ def test_dashboard_keeps_completed_manual_review_in_attention_queue(tmp_path: Pa
     assert snapshot["queue"][0]["status"] == "completed"
     assert snapshot["queue"][0]["requires_manual_review"]
     assert snapshot["queue"][0]["manual_review_stage"] == "summarize_message"
+
+
+def test_dashboard_tracks_all_parallel_active_records(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    repository = ProcessingRepository(db_path, RetrySettings())
+    first = repository.ensure("INBOX", "1", "<1>", "1")
+    second = repository.ensure("INBOX", "2", "<2>", "1")
+    repository.start(first)
+    repository.start(second)
+    repository.worker_started()
+    repository.poll_started()
+    repository.current_record(first)
+    repository.current_record(second)
+    repository.current_record(None, expected=second)
+
+    snapshot = DashboardStore(db_path, queue_limit=10, recent_limit=10).snapshot()
+
+    assert snapshot["runtime"]["active_record_count"] == 1
+    assert [item["record_id"] for item in snapshot["active"]] == [first]
+    assert snapshot["current"]["record_id"] == first
