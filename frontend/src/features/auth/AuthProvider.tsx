@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -8,6 +9,7 @@ import {
   login as loginRequest,
   logout as logoutRequest,
   setStoredAuthToken,
+  subscribeToAuthTokenChanges,
   type AuthUser,
   type LoginPayload,
 } from '../../api'
@@ -18,10 +20,21 @@ type AuthProviderProps = {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
+  const queryClient = useQueryClient()
   const [status, setStatus] = useState<AuthStatus>(() =>
     getStoredAuthToken() ? 'checking' : 'anonymous',
   )
   const [user, setUser] = useState<AuthUser | null>(null)
+
+  useEffect(() => {
+    return subscribeToAuthTokenChanges((token) => {
+      if (!token) {
+        queryClient.clear()
+        setUser(null)
+        setStatus('anonymous')
+      }
+    })
+  }, [queryClient])
 
   useEffect(() => {
     const token = getStoredAuthToken()
@@ -60,16 +73,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   const logout = useCallback(async () => {
-    try {
-      if (getStoredAuthToken()) {
-        await logoutRequest()
-      }
-    } finally {
-      clearStoredAuthToken()
-      setUser(null)
-      setStatus('anonymous')
+    if (getStoredAuthToken()) {
+      await logoutRequest().catch(() => undefined)
     }
-  }, [])
+
+    clearStoredAuthToken()
+    queryClient.clear()
+    setUser(null)
+    setStatus('anonymous')
+  }, [queryClient])
 
   const value = useMemo(
     () => ({

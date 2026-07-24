@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
 import { Button } from '../../shared'
@@ -9,11 +8,9 @@ import styles from './UserMenu.module.css'
 export function UserMenu() {
   const auth = useAuth()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
 
   async function handleLogout() {
     await auth.logout()
-    queryClient.clear()
     navigate('/login', { replace: true })
   }
 

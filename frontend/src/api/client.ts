@@ -1,7 +1,7 @@
 import type { ZodSchema } from 'zod'
 
 import { toAbsoluteApiUrl } from '../shared/lib'
-import { getBearerAuthorizationHeader } from './authToken'
+import { clearStoredAuthToken, getBearerAuthorizationHeader } from './authToken'
 import { apiConfig } from './config'
 import { parseApiError } from './errors'
 import {
@@ -92,7 +92,13 @@ async function requestJson<T>(
   })
 
   if (!response.ok) {
-    throw await parseApiError(response)
+    const error = await parseApiError(response)
+
+    if (error.status === 401 && options?.includeAuth !== false) {
+      clearStoredAuthToken()
+    }
+
+    throw error
   }
 
   const data = await response.json()
@@ -114,7 +120,13 @@ async function requestNoContent(
   })
 
   if (!response.ok) {
-    throw await parseApiError(response)
+    const error = await parseApiError(response)
+
+    if (error.status === 401) {
+      clearStoredAuthToken()
+    }
+
+    throw error
   }
 }
 

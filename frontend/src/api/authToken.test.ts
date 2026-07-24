@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   clearStoredAuthToken,
   getBearerAuthorizationHeader,
   getStoredAuthToken,
   setStoredAuthToken,
+  subscribeToAuthTokenChanges,
 } from './authToken'
 
 describe('authToken', () => {
@@ -39,5 +40,18 @@ describe('authToken', () => {
 
   it('returns null authorization header without token', () => {
     expect(getBearerAuthorizationHeader()).toBeNull()
+  })
+
+  it('notifies subscribers when current-tab token changes', () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribeToAuthTokenChanges(listener)
+
+    setStoredAuthToken('token-value')
+    clearStoredAuthToken()
+
+    expect(listener).toHaveBeenNthCalledWith(1, 'token-value')
+    expect(listener).toHaveBeenNthCalledWith(2, null)
+
+    unsubscribe()
   })
 })

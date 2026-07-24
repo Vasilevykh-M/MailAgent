@@ -1,3 +1,4 @@
+import { clearStoredAuthToken } from './authToken'
 import { buildApiHeaders, getAbsoluteApiUrl } from './client'
 import { parseApiError } from './errors'
 
@@ -38,7 +39,13 @@ export async function downloadBlobFromApiPath(
   })
 
   if (!response.ok) {
-    throw await parseApiError(response)
+    const error = await parseApiError(response)
+
+    if (error.status === 401) {
+      clearStoredAuthToken()
+    }
+
+    throw error
   }
 
   const blob = await response.blob()

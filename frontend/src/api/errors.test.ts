@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { ApiError, parseApiError } from './errors'
+import { ApiError, parseApiError, shouldRetryApiRequest } from './errors'
 
 describe('parseApiError', () => {
   it('preserves safe API error payloads', async () => {
@@ -21,5 +21,19 @@ describe('parseApiError', () => {
 
     expect(error.message).toBe('HTTP 500')
     expect(error.response).toBeNull()
+  })
+})
+
+describe('shouldRetryApiRequest', () => {
+  it('retries one network or server failure', () => {
+    expect(shouldRetryApiRequest(0, new TypeError('fetch failed'))).toBe(true)
+    expect(shouldRetryApiRequest(0, new ApiError(503, null))).toBe(true)
+    expect(shouldRetryApiRequest(1, new ApiError(503, null))).toBe(false)
+  })
+
+  it('does not retry client or validation failures', () => {
+    expect(shouldRetryApiRequest(0, new ApiError(401, null))).toBe(false)
+    expect(shouldRetryApiRequest(0, new ApiError(422, null))).toBe(false)
+    expect(shouldRetryApiRequest(0, new Error('invalid response'))).toBe(false)
   })
 })

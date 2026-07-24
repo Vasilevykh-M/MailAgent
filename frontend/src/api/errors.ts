@@ -19,3 +19,18 @@ export async function parseApiError(response: Response) {
 
   return new ApiError(response.status, parsed.success ? parsed.data : null)
 }
+
+export function shouldRetryApiRequest(
+  failureCount: number,
+  error: unknown,
+): boolean {
+  if (failureCount >= 1) {
+    return false
+  }
+
+  if (error instanceof ApiError) {
+    return error.status >= 500
+  }
+
+  return error instanceof TypeError
+}

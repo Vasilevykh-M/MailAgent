@@ -12,8 +12,9 @@ export {
   clearStoredAuthToken,
   getStoredAuthToken,
   setStoredAuthToken,
+  subscribeToAuthTokenChanges,
 } from './authToken'
-export { ApiError } from './errors'
+export { ApiError, shouldRetryApiRequest } from './errors'
 export { queryKeys } from './queryKeys'
 export {
   useEmailDetail,
