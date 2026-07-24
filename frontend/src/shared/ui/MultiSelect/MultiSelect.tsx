@@ -12,7 +12,7 @@ export type MultiSelectOption<Value extends string> = {
 }
 
 export type MultiSelectProps<Value extends string> = {
-  options: MultiSelectOption<Value>[]
+  options: ReadonlyArray<MultiSelectOption<Value>>
   placeholder: string
   value: Value[]
   onChange: (value: Value[]) => void

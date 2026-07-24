@@ -7,7 +7,6 @@ import {
   useEmailDetail,
   useEmailsInfinite,
   type EmailDetail,
-  type EmailListItem,
 } from '../../../api'
 import {
   dateInputToIsoNextDay,
@@ -18,86 +17,15 @@ import {
   TabsNav,
 } from '../../../shared'
 import { UserMenu } from '../../auth'
-import {
-  DashboardFilters,
-  defaultFilters,
-  type DashboardFiltersValue,
-} from '../DashboardFilters'
+import { DashboardFilters, defaultFilters } from '../DashboardFilters'
 import { EmailDetailPanel } from '../EmailDetailPanel'
 import { EmailList } from '../EmailList'
 import { HealthIndicator } from '../HealthIndicator'
+import { selectVisibleEmails } from '../model'
 
 import styles from './DashboardPage.module.css'
 
 const emailPageLimit = 10
-
-function matchesSearch(item: EmailListItem, search: string) {
-  const normalizedSearch = search.trim().toLowerCase()
-
-  if (!normalizedSearch) {
-    return true
-  }
-
-  return [item.subject, item.from, item.summary_preview]
-    .join(' ')
-    .toLowerCase()
-    .includes(normalizedSearch)
-}
-
-function matchesAttachmentFilter(
-  item: EmailListItem,
-  filter: DashboardFiltersValue['attachmentFilter'],
-) {
-  if (filter.length === 0) {
-    return true
-  }
-
-  return filter.some((filterValue) => {
-    if (filterValue === 'with') {
-      return item.attachment_count > 0
-    }
-
-    return item.attachment_count === 0
-  })
-}
-
-function matchesClassFilter(
-  item: EmailListItem,
-  detail: EmailDetail | undefined,
-  filter: DashboardFiltersValue['classFilter'],
-) {
-  if (filter.length === 0) {
-    return true
-  }
-
-  const classCode =
-    item.class_code ?? detail?.classification?.class_code ?? null
-
-  return filter.some((filterValue) => {
-    if (filterValue === 'none') {
-      return !classCode
-    }
-
-    return classCode === filterValue
-  })
-}
-
-function matchesStatusFilter(
-  detail: EmailDetail | undefined,
-  filter: DashboardFiltersValue['statusFilter'],
-) {
-  if (filter.length === 0) {
-    return true
-  }
-
-  return filter.some((filterValue) => {
-    if (filterValue === 'uncached') {
-      return !detail
-    }
-
-    return detail?.classification?.status === filterValue
-  })
-}
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -121,40 +49,31 @@ export function DashboardPage() {
   const emails = useEmailsInfinite(apiParams, hasValidDateRange)
   const { fetchNextPage } = emails
   const emailDetail = useEmailDetail(recordId)
-  const emailItems =
-    emails.data?.pages
-      .flatMap((page) => page.items)
-      .map((item) => {
-        const detail = queryClient.getQueryData<EmailDetail>(
-          queryKeys.emails.detail(item.id),
-        )
+  const emailItems = useMemo(() => {
+    const items = emails.data?.pages.flatMap((page) => page.items) ?? []
+    const detailsById = new Map<string, EmailDetail>()
 
-        return {
-          ...item,
-          class_code: item.class_code ?? detail?.classification?.class_code,
-          class_name_ru:
-            item.class_name_ru ?? detail?.classification?.class_name_ru,
-        }
-      })
-      .filter((item) => matchesSearch(item, search))
-      .filter((item) => matchesAttachmentFilter(item, filters.attachmentFilter))
-      .filter((item) =>
-        matchesClassFilter(
-          item,
-          queryClient.getQueryData<EmailDetail>(
-            queryKeys.emails.detail(item.id),
-          ),
-          filters.classFilter,
-        ),
+    for (const item of items) {
+      const detail = queryClient.getQueryData<EmailDetail>(
+        queryKeys.emails.detail(item.id),
       )
-      .filter((item) =>
-        matchesStatusFilter(
-          queryClient.getQueryData<EmailDetail>(
-            queryKeys.emails.detail(item.id),
-          ),
-          filters.statusFilter,
-        ),
-      ) ?? []
+
+      if (detail) {
+        detailsById.set(item.id, detail)
+      }
+    }
+
+    if (recordId && emailDetail.data) {
+      detailsById.set(recordId, emailDetail.data)
+    }
+
+    return selectVisibleEmails({
+      detailsById,
+      filters,
+      items,
+      search,
+    })
+  }, [emailDetail.data, emails.data, filters, queryClient, recordId, search])
   const nextEmailCursor =
     emails.data?.pages[emails.data.pages.length - 1]?.next_cursor ?? null
   function selectEmail(selectedRecordId: string) {

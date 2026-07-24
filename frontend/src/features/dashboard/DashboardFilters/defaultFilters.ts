@@ -1,6 +1,6 @@
-import { apiConfig } from '../../../api/config'
+import { apiConfig } from '../../../api'
 import { formatDateForInput } from '../../../shared'
-import type { DashboardFiltersValue } from './DashboardFilters'
+import type { DashboardFiltersValue } from '../model'
 
 export function defaultFilters(): DashboardFiltersValue {
   const today = new Date()

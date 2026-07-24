@@ -12,21 +12,26 @@ import {
   Skeleton,
 } from '../../../shared'
 import { formatDateTime, useIntersectionObserver } from '../../../shared'
+import {
+  getClassificationClassLabel,
+  isClassificationClassCode,
+  type ClassificationClassCode,
+} from '../model'
 
 import styles from './EmailList.module.css'
 
 const autoLoadThrottleMs = 1000
-const classNamesByCode = new Map<string, string>([
-  ['3D_PRINTERS', '3D-принтеры'],
-  ['CHEMISTRY', 'Химия'],
-  ['FOUNDRY', 'Литьё'],
-  ['MOLD_PRINTING', 'Печать форм'],
-  ['ROBOTIC_CELLS', 'Роботизированные ячейки'],
-  ['PRODUCTION_LINES', 'Производственные линии'],
-  ['MACHINES', 'Станки'],
-  ['TECHNICAL_VISION', 'Техническое зрение'],
-  ['OTHER_EQUIPMENT', 'Другое оборудование'],
-])
+const classBadgeClasses: Record<ClassificationClassCode, string> = {
+  '3D_PRINTERS': styles.class3dPrinters,
+  CHEMISTRY: styles.classChemistry,
+  FOUNDRY: styles.classFoundry,
+  MOLD_PRINTING: styles.classMoldPrinting,
+  ROBOTIC_CELLS: styles.classRoboticCells,
+  PRODUCTION_LINES: styles.classProductionLines,
+  MACHINES: styles.classMachines,
+  TECHNICAL_VISION: styles.classTechnicalVision,
+  OTHER_EQUIPMENT: styles.classOtherEquipment,
+}
 
 type EmailListProps = {
   items: EmailListItem[]
@@ -42,32 +47,10 @@ type EmailListProps = {
   onSelect: (recordId: string) => void
 }
 
-function getClassLabel(item: EmailListItem) {
-  return (
-    item.class_name_ru ||
-    (item.class_code ? classNamesByCode.get(item.class_code) : null) ||
-    item.class_code ||
-    'Без класса'
-  )
-}
-
 function getClassBadgeClass(classCode: string | null | undefined) {
-  const code = classCode ?? 'none'
-
-  return (
-    {
-      '3D_PRINTERS': styles.class3dPrinters,
-      CHEMISTRY: styles.classChemistry,
-      FOUNDRY: styles.classFoundry,
-      MOLD_PRINTING: styles.classMoldPrinting,
-      ROBOTIC_CELLS: styles.classRoboticCells,
-      PRODUCTION_LINES: styles.classProductionLines,
-      MACHINES: styles.classMachines,
-      TECHNICAL_VISION: styles.classTechnicalVision,
-      OTHER_EQUIPMENT: styles.classOtherEquipment,
-      none: styles.classNone,
-    }[code] ?? styles.classNone
-  )
+  return classCode && isClassificationClassCode(classCode)
+    ? classBadgeClasses[classCode]
+    : styles.classNone
 }
 
 export function EmailList({
@@ -185,7 +168,10 @@ export function EmailList({
                     className={`${styles.classBadge} ${getClassBadgeClass(item.class_code)}`}
                     tone="neutral"
                   >
-                    {getClassLabel(item)}
+                    {getClassificationClassLabel(
+                      item.class_code,
+                      item.class_name_ru,
+                    )}
                   </Badge>
                 }
                 description={item.summary_preview}
