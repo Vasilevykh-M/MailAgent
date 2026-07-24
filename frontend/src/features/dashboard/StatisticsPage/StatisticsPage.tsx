@@ -7,6 +7,7 @@ import {
   isDateInputRangeValid,
   PageShell,
   TabsNav,
+  useDebouncedValue,
 } from '../../../shared'
 import { UserMenu } from '../../auth'
 import { DashboardFilters, defaultFilters } from '../DashboardFilters'
@@ -18,13 +19,14 @@ import styles from './StatisticsPage.module.css'
 
 export function StatisticsPage() {
   const [filters, setFilters] = useState(defaultFilters)
+  const debouncedMailbox = useDebouncedValue(filters.mailbox)
   const apiParams = useMemo(
     () => ({
       from: dateInputToIsoStart(filters.fromDate),
       to: dateInputToIsoNextDay(filters.toDate),
-      mailbox: filters.mailbox.trim() || null,
+      mailbox: debouncedMailbox.trim() || null,
     }),
-    [filters.fromDate, filters.mailbox, filters.toDate],
+    [debouncedMailbox, filters.fromDate, filters.toDate],
   )
   const hasValidDateRange = isDateInputRangeValid(
     filters.fromDate,

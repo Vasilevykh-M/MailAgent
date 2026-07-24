@@ -1,7 +1,25 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
-import { DashboardPage, StatisticsPage } from '../features'
 import { LoginPage, RequireAuth } from '../features/auth'
+import { DashboardPage } from '../features/dashboard/DashboardPage'
+import { Card, PageShell, Skeleton } from '../shared'
+
+const StatisticsPage = lazy(() =>
+  import('../features/dashboard/StatisticsPage').then((module) => ({
+    default: module.StatisticsPage,
+  })),
+)
+
+function RouteLoading() {
+  return (
+    <PageShell title="Mail Agent">
+      <Card title="Загрузка страницы">
+        <Skeleton height={120} />
+      </Card>
+    </PageShell>
+  )
+}
 
 export function AppRouter() {
   return (
@@ -27,7 +45,9 @@ export function AppRouter() {
         path="/statistics"
         element={
           <RequireAuth>
-            <StatisticsPage />
+            <Suspense fallback={<RouteLoading />}>
+              <StatisticsPage />
+            </Suspense>
           </RequireAuth>
         }
       />

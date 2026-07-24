@@ -75,7 +75,8 @@ proxy/BFF или другой server-side слой авторизации.
 - Локальный поиск по загруженным страницам списка.
 - Локальные фильтры по вложениям, confidence и кешированному статусу detail.
 - KPI по `/api/v1/statistics`.
-- Графики по статусам и классам через `Recharts`.
+- Графики по статусам и классам через `Recharts`; страница статистики
+  загружается отдельным lazy chunk.
 - Список писем с автоматической догрузкой следующих страниц.
 - Выбор письма через route `/emails/:recordId`.
 - Detail panel: summary, classification, key facts, warnings, content,
@@ -90,8 +91,6 @@ proxy/BFF или другой server-side слой авторизации.
 - API не отдаёт список mailbox, поэтому `mailbox` вводится вручную.
 - Фильтр по статусу в UI работает только для писем, detail которых уже есть в
   TanStack Query cache.
-- `Recharts` увеличивает production chunk; при необходимости графики можно
-  вынести в lazy chunk.
 
 ## Команды
 

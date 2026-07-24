@@ -2,10 +2,14 @@ import type { EmailDetail, EmailListItem } from '../../../api'
 import type { DashboardFiltersValue } from './filters'
 
 type CachedEmailDetail = Pick<EmailDetail, 'classification'>
+type EmailListFilters = Pick<
+  DashboardFiltersValue,
+  'attachmentFilter' | 'classFilter' | 'statusFilter'
+>
 
 type SelectVisibleEmailsOptions = {
   detailsById: ReadonlyMap<string, CachedEmailDetail>
-  filters: DashboardFiltersValue
+  filters: EmailListFilters
   items: EmailListItem[]
   search: string
 }

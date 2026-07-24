@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import {
@@ -15,6 +15,7 @@ import {
   Modal,
   PageShell,
   TabsNav,
+  useDebouncedValue,
 } from '../../../shared'
 import { UserMenu } from '../../auth'
 import { DashboardFilters, defaultFilters } from '../DashboardFilters'
@@ -33,14 +34,24 @@ export function DashboardPage() {
   const { recordId = null } = useParams()
   const [filters, setFilters] = useState(defaultFilters)
   const [search, setSearch] = useState('')
+  const debouncedMailbox = useDebouncedValue(filters.mailbox)
+  const deferredSearch = useDeferredValue(search)
+  const listFilters = useMemo(
+    () => ({
+      attachmentFilter: filters.attachmentFilter,
+      classFilter: filters.classFilter,
+      statusFilter: filters.statusFilter,
+    }),
+    [filters.attachmentFilter, filters.classFilter, filters.statusFilter],
+  )
   const apiParams = useMemo(
     () => ({
       from: dateInputToIsoStart(filters.fromDate),
       to: dateInputToIsoNextDay(filters.toDate),
-      mailbox: filters.mailbox.trim() || null,
+      mailbox: debouncedMailbox.trim() || null,
       limit: emailPageLimit,
     }),
-    [filters.fromDate, filters.mailbox, filters.toDate],
+    [debouncedMailbox, filters.fromDate, filters.toDate],
   )
   const hasValidDateRange = isDateInputRangeValid(
     filters.fromDate,
@@ -69,11 +80,18 @@ export function DashboardPage() {
 
     return selectVisibleEmails({
       detailsById,
-      filters,
+      filters: listFilters,
       items,
-      search,
+      search: deferredSearch,
     })
-  }, [emailDetail.data, emails.data, filters, queryClient, recordId, search])
+  }, [
+    deferredSearch,
+    emailDetail.data,
+    emails.data,
+    listFilters,
+    queryClient,
+    recordId,
+  ])
   const nextEmailCursor =
     emails.data?.pages[emails.data.pages.length - 1]?.next_cursor ?? null
   function selectEmail(selectedRecordId: string) {

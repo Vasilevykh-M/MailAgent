@@ -5,6 +5,8 @@
 }
 
 .item {
+  contain-intrinsic-block-size: auto 100px;
+  content-visibility: auto;
   width: 100%;
   padding: var(--space-3);
   border: 1px solid var(--color-border);
