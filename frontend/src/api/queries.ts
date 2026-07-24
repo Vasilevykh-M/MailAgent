@@ -8,6 +8,7 @@ import {
   getStatistics,
 } from './client'
 import { queryKeys } from './queryKeys'
+import { emailListParamsSchema, statisticsParamsSchema } from './schemas'
 import type { EmailListParams, StatisticsParams } from './types'
 
 export function useHealthLive() {
@@ -26,20 +27,31 @@ export function useHealthReady() {
   })
 }
 
-export function useStatistics(params: StatisticsParams) {
+export function useStatistics(params: StatisticsParams, enabled = true) {
+  const parsedParams = statisticsParamsSchema.safeParse(params)
+
   return useQuery({
     queryKey: queryKeys.statistics.detail(params),
     queryFn: ({ signal }) => getStatistics(params, signal),
-    enabled: Boolean(params.from && params.to),
+    enabled:
+      enabled &&
+      parsedParams.success &&
+      Boolean(parsedParams.data.from && parsedParams.data.to),
   })
 }
 
-export function useEmailsInfinite(params: Omit<EmailListParams, 'cursor'>) {
+export function useEmailsInfinite(
+  params: Omit<EmailListParams, 'cursor'>,
+  enabled = true,
+) {
+  const hasValidParams = emailListParamsSchema.safeParse(params).success
+
   return useInfiniteQuery({
     queryKey: queryKeys.emails.list(params),
     queryFn: ({ pageParam, signal }) =>
       getEmails({ ...params, cursor: pageParam }, signal),
     initialPageParam: null as string | null,
+    enabled: enabled && hasValidParams,
     getNextPageParam: (lastPage) =>
       lastPage.has_more ? lastPage.next_cursor : undefined,
   })

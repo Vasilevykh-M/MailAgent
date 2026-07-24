@@ -2,7 +2,7 @@ import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 
-import { ApiError } from '../../api'
+import { ApiError, loginPayloadSchema } from '../../api'
 import { Alert, Button, Card, Field, Input, ThemeSwitch } from '../../shared'
 import { useAuth } from './useAuth'
 
@@ -13,6 +13,11 @@ type LoginLocationState = {
     pathname?: string
     search?: string
   }
+}
+
+type LoginFieldErrors = {
+  username?: string
+  password?: string
 }
 
 function redirectPath(state: unknown): string {
@@ -38,6 +43,7 @@ export function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const destination = redirectPath(location.state)
 
@@ -48,13 +54,33 @@ export function LoginPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
+    setFieldErrors({})
+
+    const parsedPayload = loginPayloadSchema.safeParse({
+      password,
+      username,
+    })
+
+    if (!parsedPayload.success) {
+      const invalidFields = new Set(
+        parsedPayload.error.issues.map((issue) => issue.path[0]),
+      )
+
+      setFieldErrors({
+        password: invalidFields.has('password')
+          ? 'Введите password.'
+          : undefined,
+        username: invalidFields.has('username')
+          ? 'Введите username.'
+          : undefined,
+      })
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
-      await auth.login({
-        password,
-        username: username.trim(),
-      })
+      await auth.login(parsedPayload.data)
       navigate(destination, { replace: true })
     } catch (loginError) {
       setError(loginErrorMessage(loginError))
@@ -72,39 +98,47 @@ export function LoginPage() {
           description="Введите учётные данные Results API."
           actions={<ThemeSwitch />}
         >
-          <form className={styles.form} onSubmit={handleSubmit}>
+          <form className={styles.form} noValidate onSubmit={handleSubmit}>
             {error && (
               <Alert tone="danger" title="Ошибка входа">
                 {error}
               </Alert>
             )}
 
-            <Field label="Username">
+            <Field error={fieldErrors.username} label="Username">
               <Input
                 autoComplete="username"
                 autoFocus
-                onChange={(event) => setUsername(event.target.value)}
-                required
+                invalid={Boolean(fieldErrors.username)}
+                onChange={(event) => {
+                  setUsername(event.target.value)
+                  setFieldErrors((current) => ({
+                    ...current,
+                    username: undefined,
+                  }))
+                }}
                 value={username}
               />
             </Field>
 
-            <Field label="Password">
+            <Field error={fieldErrors.password} label="Password">
               <Input
                 autoComplete="current-password"
-                onChange={(event) => setPassword(event.target.value)}
-                required
+                invalid={Boolean(fieldErrors.password)}
+                onChange={(event) => {
+                  setPassword(event.target.value)
+                  setFieldErrors((current) => ({
+                    ...current,
+                    password: undefined,
+                  }))
+                }}
                 type="password"
                 value={password}
               />
             </Field>
 
             <div className={styles.actions}>
-              <Button
-                disabled={isSubmitting || !username.trim() || !password}
-                type="submit"
-                variant="secondary"
-              >
+              <Button disabled={isSubmitting} type="submit" variant="secondary">
                 {isSubmitting ? 'Вход...' : 'Войти'}
               </Button>
             </div>

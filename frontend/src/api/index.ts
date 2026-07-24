@@ -15,6 +15,7 @@ export {
   subscribeToAuthTokenChanges,
 } from './authToken'
 export { ApiError, shouldRetryApiRequest } from './errors'
+export { loginPayloadSchema } from './schemas'
 export { queryKeys } from './queryKeys'
 export {
   useEmailDetail,

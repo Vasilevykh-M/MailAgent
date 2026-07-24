@@ -7,9 +7,12 @@ import { parseApiError } from './errors'
 import {
   currentUserSchema,
   emailDetailSchema,
+  emailListParamsSchema,
   emailListResponseSchema,
   healthResponseSchema,
+  loginPayloadSchema,
   loginResponseSchema,
+  statisticsParamsSchema,
   statisticsResponseSchema,
 } from './schemas'
 import type {
@@ -130,12 +133,14 @@ async function requestNoContent(
   }
 }
 
-export function login(
+export async function login(
   payload: LoginPayload,
   signal?: AbortSignal,
 ): Promise<LoginResponse> {
+  const parsedPayload = loginPayloadSchema.parse(payload)
+
   return requestJson('/api/v1/auth/login', loginResponseSchema, {
-    body: payload,
+    body: parsedPayload,
     includeAuth: false,
     method: 'POST',
     signal,
@@ -161,22 +166,26 @@ export function getHealthReady(signal?: AbortSignal): Promise<HealthResponse> {
   return requestJson('/health/ready', healthResponseSchema, { signal })
 }
 
-export function getEmails(
+export async function getEmails(
   params: EmailListParams = {},
   signal?: AbortSignal,
 ): Promise<EmailListResponse> {
+  const parsedParams = emailListParamsSchema.parse(params)
+
   return requestJson('/api/v1/emails', emailListResponseSchema, {
-    params,
+    params: parsedParams,
     signal,
   })
 }
 
-export function getStatistics(
+export async function getStatistics(
   params: StatisticsParams,
   signal?: AbortSignal,
 ): Promise<StatisticsResponse> {
+  const parsedParams = statisticsParamsSchema.parse(params)
+
   return requestJson('/api/v1/statistics', statisticsResponseSchema, {
-    params,
+    params: parsedParams,
     signal,
   })
 }

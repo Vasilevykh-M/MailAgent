@@ -63,4 +63,12 @@ describe('API auth failures', () => {
     ).rejects.toMatchObject({ status: 401 })
     expect(getStoredAuthToken()).toBe('existing-token')
   })
+
+  it('rejects invalid list parameters before fetch', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getEmails({ limit: 101 })).rejects.toBeDefined()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })

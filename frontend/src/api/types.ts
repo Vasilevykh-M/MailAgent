@@ -8,10 +8,13 @@ import type {
   currentUserSchema,
   emailDetailSchema,
   emailListItemSchema,
+  emailListParamsSchema,
   emailListResponseSchema,
   healthResponseSchema,
+  loginPayloadSchema,
   loginResponseSchema,
   originalEmailSchema,
+  statisticsParamsSchema,
   statisticsResponseSchema,
 } from './schemas'
 
@@ -29,22 +32,6 @@ export type ClassificationStatisticsItem = z.infer<
 export type OriginalEmail = z.infer<typeof originalEmailSchema>
 export type Attachment = z.infer<typeof attachmentSchema>
 export type EmailDetail = z.infer<typeof emailDetailSchema>
-
-export type EmailListParams = {
-  limit?: number
-  cursor?: string | null
-  from?: string | null
-  to?: string | null
-  mailbox?: string | null
-}
-
-export type StatisticsParams = {
-  from: string | null
-  to: string | null
-  mailbox?: string | null
-}
-
-export type LoginPayload = {
-  username: string
-  password: string
-}
+export type EmailListParams = z.infer<typeof emailListParamsSchema>
+export type StatisticsParams = z.infer<typeof statisticsParamsSchema>
+export type LoginPayload = z.infer<typeof loginPayloadSchema>

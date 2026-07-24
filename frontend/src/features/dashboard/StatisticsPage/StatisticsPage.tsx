@@ -4,6 +4,7 @@ import { useStatistics } from '../../../api'
 import {
   dateInputToIsoNextDay,
   dateInputToIsoStart,
+  isDateInputRangeValid,
   PageShell,
   TabsNav,
 } from '../../../shared'
@@ -25,7 +26,11 @@ export function StatisticsPage() {
     }),
     [filters.fromDate, filters.mailbox, filters.toDate],
   )
-  const statistics = useStatistics(apiParams)
+  const hasValidDateRange = isDateInputRangeValid(
+    filters.fromDate,
+    filters.toDate,
+  )
+  const statistics = useStatistics(apiParams, hasValidDateRange)
 
   return (
     <PageShell

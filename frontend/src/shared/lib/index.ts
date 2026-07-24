@@ -10,5 +10,6 @@ export {
   formatJson,
   formatNullable,
   getConfidenceTone,
+  isDateInputRangeValid,
 } from './format'
 export { toAbsoluteApiUrl } from './url'

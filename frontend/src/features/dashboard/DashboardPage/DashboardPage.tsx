@@ -12,6 +12,7 @@ import {
 import {
   dateInputToIsoNextDay,
   dateInputToIsoStart,
+  isDateInputRangeValid,
   Modal,
   PageShell,
   TabsNav,
@@ -113,7 +114,11 @@ export function DashboardPage() {
     }),
     [filters.fromDate, filters.mailbox, filters.toDate],
   )
-  const emails = useEmailsInfinite(apiParams)
+  const hasValidDateRange = isDateInputRangeValid(
+    filters.fromDate,
+    filters.toDate,
+  )
+  const emails = useEmailsInfinite(apiParams, hasValidDateRange)
   const { fetchNextPage } = emails
   const emailDetail = useEmailDetail(recordId)
   const emailItems =

@@ -1,6 +1,7 @@
 import { clearStoredAuthToken } from './authToken'
 import { buildApiHeaders, getAbsoluteApiUrl } from './client'
 import { parseApiError } from './errors'
+import { apiDownloadPathSchema } from './schemas'
 
 function triggerBrowserDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -15,14 +16,18 @@ function triggerBrowserDownload(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-function filenameFromContentDisposition(value: string | null) {
+export function filenameFromContentDisposition(value: string | null) {
   if (!value) {
     return null
   }
 
   const utfMatch = /filename\*=UTF-8''([^;]+)/i.exec(value)
   if (utfMatch?.[1]) {
-    return decodeURIComponent(utfMatch[1])
+    try {
+      return decodeURIComponent(utfMatch[1])
+    } catch {
+      return null
+    }
   }
 
   const asciiMatch = /filename="?([^";]+)"?/i.exec(value)
@@ -34,7 +39,8 @@ export async function downloadBlobFromApiPath(
   path: string,
   fallbackFilename: string,
 ) {
-  const response = await fetch(getAbsoluteApiUrl(path), {
+  const safePath = apiDownloadPathSchema.parse(path)
+  const response = await fetch(getAbsoluteApiUrl(safePath), {
     headers: buildApiHeaders({ acceptJson: false }),
   })
 

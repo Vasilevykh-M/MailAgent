@@ -1,5 +1,22 @@
 import { format } from 'date-fns'
 
+function parseDateInput(value: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null
+  }
+
+  const date = new Date(`${value}T00:00:00.000Z`)
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== value
+  ) {
+    return null
+  }
+
+  return date
+}
+
 export function formatDateTime(value: string): string {
   const date = new Date(value)
 
@@ -29,13 +46,9 @@ export function dateInputToIsoStart(value: string): string | null {
     return null
   }
 
-  const date = new Date(`${value}T00:00:00.000Z`)
+  const date = parseDateInput(value)
 
-  if (Number.isNaN(date.getTime())) {
-    return null
-  }
-
-  return date.toISOString()
+  return date?.toISOString() ?? null
 }
 
 export function dateInputToIsoNextDay(value: string): string | null {
@@ -43,15 +56,26 @@ export function dateInputToIsoNextDay(value: string): string | null {
     return null
   }
 
-  const date = new Date(`${value}T00:00:00.000Z`)
+  const date = parseDateInput(value)
 
-  if (Number.isNaN(date.getTime())) {
+  if (!date) {
     return null
   }
 
   date.setUTCDate(date.getUTCDate() + 1)
 
   return date.toISOString()
+}
+
+export function isDateInputRangeValid(from: string, to: string): boolean {
+  const fromDate = from ? parseDateInput(from) : null
+  const toDate = to ? parseDateInput(to) : null
+
+  if ((from && !fromDate) || (to && !toDate)) {
+    return false
+  }
+
+  return !fromDate || !toDate || fromDate.getTime() <= toDate.getTime()
 }
 
 export function formatInteger(value: number): string {

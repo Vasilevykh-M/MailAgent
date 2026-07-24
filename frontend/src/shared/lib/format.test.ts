@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  dateInputToIsoNextDay,
+  dateInputToIsoStart,
   formatConfidence,
   formatFileSize,
   formatJson,
   formatNullable,
   getConfidenceTone,
+  isDateInputRangeValid,
 } from './format'
 
 describe('format helpers', () => {
@@ -31,5 +34,17 @@ describe('format helpers', () => {
 
   it('formats JSON with indentation', () => {
     expect(formatJson({ value: 1 })).toBe('{\n  "value": 1\n}')
+  })
+
+  it('converts only valid date inputs to API boundaries', () => {
+    expect(dateInputToIsoStart('2026-07-17')).toBe('2026-07-17T00:00:00.000Z')
+    expect(dateInputToIsoNextDay('2026-07-17')).toBe('2026-07-18T00:00:00.000Z')
+    expect(dateInputToIsoStart('2026-02-30')).toBeNull()
+  })
+
+  it('validates raw date input order', () => {
+    expect(isDateInputRangeValid('2026-07-01', '2026-07-31')).toBe(true)
+    expect(isDateInputRangeValid('2026-07-31', '2026-07-01')).toBe(false)
+    expect(isDateInputRangeValid('2026-02-30', '2026-07-01')).toBe(false)
   })
 })
